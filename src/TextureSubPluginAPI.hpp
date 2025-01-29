@@ -14,9 +14,9 @@ extern IUnityInterfaces* g_UnityInterfaces;
 extern IUnityGraphics* g_Graphics;
 extern IUnityLog* g_Log;
 
-class RenderAPI {
+class TextureSubPluginAPI {
  public:
-  virtual ~RenderAPI() {}
+  virtual ~TextureSubPluginAPI() {}
 
   virtual void CreateTexture3D(uint32_t width, uint32_t height, uint32_t depth,
                                Format format, void*& texture) = 0;
@@ -74,4 +74,4 @@ class RenderAPI {
 /// @param apiType Graphics API type. Currently only: kUnityGfxRendererD3D11 and
 /// kUnityGfxRendererOpenGLCore are supported
 /// @return to the created render API
-RenderAPI* CreateRenderAPI(UnityGfxRenderer apiType);
+TextureSubPluginAPI* CreateRenderAPI(UnityGfxRenderer apiType);

@@ -1,8 +1,8 @@
 #include <sstream>
 #include <string>
 
-#include "PlatformBase.h"
-#include "RenderAPI.h"
+#include "PlatformBase.hpp"
+#include "TextureSubPluginAPI.hpp"
 
 // OpenGL Core profile (desktop) or OpenGL ES (mobile) implementation of
 // RenderAPI. Supports several flavors: Core, ES2, ES3
@@ -17,10 +17,8 @@
 #elif UNITY_OSX
 #include <OpenGL/gl3.h>
 #elif UNITY_WIN
-// On Windows, use gl3w to initialize and load OpenGL Core functions. In
-// principle any other library (like GLEW, GLFW etc.) can be used; here we use
-// gl3w since it's simple and straightforward.
-#include "gl3w/gl3w.h"
+#define GLFW_INCLUDE_NONE
+#include <glad/glad.h>
 #elif UNITY_LINUX
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h>
@@ -36,10 +34,10 @@
 #error Unknown platform
 #endif
 
-class RenderAPI_OpenGLCoreES : public RenderAPI {
+class TextureSubPluginAPI_OpenGLCoreES : public TextureSubPluginAPI {
  public:
-  RenderAPI_OpenGLCoreES(UnityGfxRenderer apiType);
-  virtual ~RenderAPI_OpenGLCoreES() {}
+  TextureSubPluginAPI_OpenGLCoreES(UnityGfxRenderer apiType);
+  virtual ~TextureSubPluginAPI_OpenGLCoreES() {}
 
   virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type,
                                   IUnityInterfaces* interfaces);
@@ -62,29 +60,29 @@ class RenderAPI_OpenGLCoreES : public RenderAPI {
   UnityGfxRenderer m_APIType;
 };
 
-RenderAPI* CreateRenderAPI_OpenGLCoreES(UnityGfxRenderer apiType) {
-  return new RenderAPI_OpenGLCoreES(apiType);
+TextureSubPluginAPI* CreateRenderAPI_OpenGLCoreES(UnityGfxRenderer apiType) {
+  return new TextureSubPluginAPI_OpenGLCoreES(apiType);
 }
 
-RenderAPI_OpenGLCoreES::RenderAPI_OpenGLCoreES(UnityGfxRenderer apiType)
+TextureSubPluginAPI_OpenGLCoreES::TextureSubPluginAPI_OpenGLCoreES(
+    UnityGfxRenderer apiType)
     : m_APIType(apiType) {}
 
-void RenderAPI_OpenGLCoreES::ProcessDeviceEvent(UnityGfxDeviceEventType type,
-                                                IUnityInterfaces* interfaces) {
+void TextureSubPluginAPI_OpenGLCoreES::ProcessDeviceEvent(
+    UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) {
   if (type == kUnityGfxDeviceEventInitialize) {
 #ifdef DEBUG
     UNITY_LOG(g_Log, "kUnityGfxDeviceEventInitialize");
 #endif
 #if UNITY_WIN && SUPPORT_OPENGL_CORE
     if (m_APIType == kUnityGfxRendererOpenGLCore) {
-      gl3wInit();
+      int version = gladLoadGL();
       int version_major, version_minor;
       glGetIntegerv(GL_MAJOR_VERSION, &version_major);
       glGetIntegerv(GL_MINOR_VERSION, &version_minor);
       std::ostringstream ss;
       ss << "OpenGL version: " << glGetString(GL_VERSION) << std::endl;
-      ss << "Supports " << version_major << "." << version_minor << ": "
-         << gl3wIsSupported(version_major, version_minor);
+      ss << "Supports " << version_major << "." << version_minor;
       UNITY_LOG(g_Log, ss.str().c_str());
     }
 #endif
@@ -102,12 +100,10 @@ void RenderAPI_OpenGLCoreES::ProcessDeviceEvent(UnityGfxDeviceEventType type,
   }
 }
 
-void RenderAPI_OpenGLCoreES::TextureSubImage3D(void* texture_handle,
-                                               int32_t xoffset, int32_t yoffset,
-                                               int32_t zoffset, int32_t width,
-                                               int32_t height, int32_t depth,
-                                               void* data_ptr, int32_t level,
-                                               Format format) {
+void TextureSubPluginAPI_OpenGLCoreES::TextureSubImage3D(
+    void* texture_handle, int32_t xoffset, int32_t yoffset, int32_t zoffset,
+    int32_t width, int32_t height, int32_t depth, void* data_ptr, int32_t level,
+    Format format) {
   GLuint gltex = (GLuint)(size_t)(texture_handle);
 
   GLenum gltype;
@@ -139,11 +135,9 @@ void RenderAPI_OpenGLCoreES::TextureSubImage3D(void* texture_handle,
   }
 }
 
-void RenderAPI_OpenGLCoreES::TextureSubImage2D(void* texture_handle,
-                                               int32_t xoffset, int32_t yoffset,
-                                               int32_t width, int32_t height,
-                                               void* data_ptr, int32_t level,
-                                               Format format) {
+void TextureSubPluginAPI_OpenGLCoreES::TextureSubImage2D(
+    void* texture_handle, int32_t xoffset, int32_t yoffset, int32_t width,
+    int32_t height, void* data_ptr, int32_t level, Format format) {
   GLuint gltex = (GLuint)(size_t)(texture_handle);
 
   GLenum gltype;
@@ -164,9 +158,11 @@ void RenderAPI_OpenGLCoreES::TextureSubImage2D(void* texture_handle,
                   gltype, data_ptr);
 }
 
-void RenderAPI_OpenGLCoreES::CreateTexture3D(uint32_t width, uint32_t height,
-                                             uint32_t depth, Format format,
-                                             void*& texture) {
+void TextureSubPluginAPI_OpenGLCoreES::CreateTexture3D(uint32_t width,
+                                                       uint32_t height,
+                                                       uint32_t depth,
+                                                       Format format,
+                                                       void*& texture) {
   int MAX_DIM_SIZE;
   glGetIntegerv(GL_MAX_3D_TEXTURE_SIZE, &MAX_DIM_SIZE);
   {
@@ -233,7 +229,7 @@ void RenderAPI_OpenGLCoreES::CreateTexture3D(uint32_t width, uint32_t height,
   texture = (void*)gl_texture;
 }
 
-void RenderAPI_OpenGLCoreES::ClearTexture3D(void* texture_handle) {
+void TextureSubPluginAPI_OpenGLCoreES::ClearTexture3D(void* texture_handle) {
   glDeleteTextures(1, (GLuint*)&texture_handle);
 }
 

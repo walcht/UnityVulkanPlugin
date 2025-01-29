@@ -1,8 +1,8 @@
 #include <assert.h>
 #include <math.h>
 
-#include "PlatformBase.h"
-#include "RenderAPI.h"
+#include "PlatformBase.hpp"
+#include "TextureSubPluginAPI.hpp"
 
 enum Event {
   TextureSubImage2D = 0,
@@ -30,7 +30,7 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
 }
 
 // GraphicsDeviceEvent
-static RenderAPI* s_CurrentAPI = NULL;
+static TextureSubPluginAPI* s_CurrentAPI = NULL;
 static UnityGfxRenderer s_DeviceType = kUnityGfxRendererNull;
 
 static void UNITY_INTERFACE_API

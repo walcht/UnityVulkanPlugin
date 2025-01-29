@@ -1,5 +1,5 @@
-#include "PlatformBase.h"
-#include "RenderAPI.h"
+#include "PlatformBase.hpp"
+#include "TextureSubPluginAPI.hpp"
 
 #if SUPPORT_D3D11
 
@@ -12,10 +12,10 @@
 #include "Unity/IUnityGraphicsD3D11.h"
 #include "Unity/IUnityLog.h"
 
-class RenderAPI_D3D11 : public RenderAPI {
+class TextureSubPluginAPI_D3D11 : public TextureSubPluginAPI {
  public:
-  RenderAPI_D3D11();
-  virtual ~RenderAPI_D3D11() {}
+  TextureSubPluginAPI_D3D11();
+  virtual ~TextureSubPluginAPI_D3D11() {}
 
   virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type,
                                   IUnityInterfaces* interfaces);
@@ -38,12 +38,14 @@ class RenderAPI_D3D11 : public RenderAPI {
   ID3D11Device* m_Device;
 };
 
-RenderAPI* CreateRenderAPI_D3D11() { return new RenderAPI_D3D11(); }
+TextureSubPluginAPI* CreateRenderAPI_D3D11() {
+  return new TextureSubPluginAPI_D3D11();
+}
 
-RenderAPI_D3D11::RenderAPI_D3D11() : m_Device(NULL) {}
+TextureSubPluginAPI_D3D11::TextureSubPluginAPI_D3D11() : m_Device(NULL) {}
 
-void RenderAPI_D3D11::ProcessDeviceEvent(UnityGfxDeviceEventType type,
-                                         IUnityInterfaces* interfaces) {
+void TextureSubPluginAPI_D3D11::ProcessDeviceEvent(
+    UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) {
   switch (type) {
     case kUnityGfxDeviceEventInitialize: {
       IUnityGraphicsD3D11* d3d = interfaces->Get<IUnityGraphicsD3D11>();
@@ -53,10 +55,9 @@ void RenderAPI_D3D11::ProcessDeviceEvent(UnityGfxDeviceEventType type,
   }
 }
 
-void RenderAPI_D3D11::TextureSubImage2D(void* texture_handle, int32_t xoffset,
-                                        int32_t yoffset, int32_t width,
-                                        int32_t height, void* data_ptr,
-                                        int32_t level, Format format) {
+void TextureSubPluginAPI_D3D11::TextureSubImage2D(
+    void* texture_handle, int32_t xoffset, int32_t yoffset, int32_t width,
+    int32_t height, void* data_ptr, int32_t level, Format format) {
   // determine row pitch/depth from provided format
   uint32_t row_pitch;
   switch (format) {
@@ -90,11 +91,10 @@ void RenderAPI_D3D11::TextureSubImage2D(void* texture_handle, int32_t xoffset,
   ctx->Release();
 }
 
-void RenderAPI_D3D11::TextureSubImage3D(void* texture_handle, int32_t xoffset,
-                                        int32_t yoffset, int32_t zoffset,
-                                        int32_t width, int32_t height,
-                                        int32_t depth, void* data_ptr,
-                                        int32_t level, Format format) {
+void TextureSubPluginAPI_D3D11::TextureSubImage3D(
+    void* texture_handle, int32_t xoffset, int32_t yoffset, int32_t zoffset,
+    int32_t width, int32_t height, int32_t depth, void* data_ptr, int32_t level,
+    Format format) {
   // determine row pitch/depth from provided format
   uint32_t row_pitch;
   switch (format) {
@@ -128,9 +128,9 @@ void RenderAPI_D3D11::TextureSubImage3D(void* texture_handle, int32_t xoffset,
 }
 
 // google: direct3d 11 resources limits
-void RenderAPI_D3D11::CreateTexture3D(uint32_t width, uint32_t height,
-                                      uint32_t depth, Format format,
-                                      void*& texture) {
+void TextureSubPluginAPI_D3D11::CreateTexture3D(uint32_t width, uint32_t height,
+                                                uint32_t depth, Format format,
+                                                void*& texture) {
   uint32_t size_in_bytes;
   D3D11_TEXTURE3D_DESC desc;
   desc.Width = width;
@@ -188,7 +188,7 @@ void RenderAPI_D3D11::CreateTexture3D(uint32_t width, uint32_t height,
   ctx->Release();
 }
 
-void RenderAPI_D3D11::ClearTexture3D(void* texture_handle) {
+void TextureSubPluginAPI_D3D11::ClearTexture3D(void* texture_handle) {
   ID3D11Texture3D* d3dtex = (ID3D11Texture3D*)texture_handle;
   assert(d3dtex);
   // TODO: is this the correct way to release a resource in Direct3D 11?

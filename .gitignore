@@ -398,4 +398,7 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Build
-.build/*
+build/
+
+# external dependencies
+extern/
