@@ -16,8 +16,8 @@ target_include_directories(TextureSubPlugin
 # compiler flags (CXXFLAGS)
 target_compile_definitions(TextureSubPlugin
     PRIVATE
-        -DSUPPORT_OPENGL_UNIFIED=1
-    #    -DSUPPORT_VULKAN=1
+        -DSUPPORT_VULKAN=1
+    #    -DSUPPORT_OPENGL_UNIFIED=1
     #    -DUNITY_LINUX=1
 )
 if (NOT MSVC)
@@ -26,6 +26,8 @@ if (NOT MSVC)
 endif()
 # find OpenGL and link against it
 find_package(OpenGL REQUIRED)
+find_package(Vulkan REQUIRED)
 target_link_libraries(TextureSubPlugin
-    OpenGL::GL
+    # OpenGL::GL
+    Vulkan::Vulkan
 )

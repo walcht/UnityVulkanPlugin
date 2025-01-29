@@ -5,6 +5,7 @@
 
 #include <math.h>
 #include <string.h>
+#include <sstream>
 
 #include <map>
 #include <vector>
@@ -158,194 +159,28 @@ struct VulkanBuffer {
   VkMemoryPropertyFlags deviceMemoryFlags;
 };
 
-static VkPipelineLayout CreateTrianglePipelineLayout(VkDevice device) {
-  VkPushConstantRange pushConstantRange;
-  pushConstantRange.offset = 0;
-  pushConstantRange.size = 64;  // single matrix
-  pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-  VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
-  pipelineLayoutCreateInfo.sType =
-      VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-  pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-
-  VkPipelineLayout pipelineLayout;
-  return vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, NULL,
-                                &pipelineLayout) == VK_SUCCESS
-             ? pipelineLayout
-             : VK_NULL_HANDLE;
-}
-
-static VkPipeline CreateTrianglePipeline(VkDevice device,
-                                         VkPipelineLayout pipelineLayout,
-                                         VkRenderPass renderPass,
-                                         VkPipelineCache pipelineCache) {
-  if (pipelineLayout == VK_NULL_HANDLE) return VK_NULL_HANDLE;
-  if (device == VK_NULL_HANDLE) return VK_NULL_HANDLE;
-  if (renderPass == VK_NULL_HANDLE) return VK_NULL_HANDLE;
-
-  bool success = true;
-  VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
-
-  VkPipelineShaderStageCreateInfo shaderStages[2] = {};
-  shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-  shaderStages[0].pName = "main";
-  shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  shaderStages[1].pName = "main";
-
-  if (success) {
-    VkShaderModuleCreateInfo moduleCreateInfo = {};
-    moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    moduleCreateInfo.codeSize = sizeof(Shader::vertexShaderSpirv);
-    moduleCreateInfo.pCode = Shader::vertexShaderSpirv;
-    success = vkCreateShaderModule(device, &moduleCreateInfo, NULL,
-                                   &shaderStages[0].module) == VK_SUCCESS;
-  }
-
-  if (success) {
-    VkShaderModuleCreateInfo moduleCreateInfo = {};
-    moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    moduleCreateInfo.codeSize = sizeof(Shader::fragmentShaderSpirv);
-    moduleCreateInfo.pCode = Shader::fragmentShaderSpirv;
-    success = vkCreateShaderModule(device, &moduleCreateInfo, NULL,
-                                   &shaderStages[1].module) == VK_SUCCESS;
-  }
-
-  VkPipeline pipeline;
-  if (success) {
-    pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineCreateInfo.layout = pipelineLayout;
-    pipelineCreateInfo.renderPass = renderPass;
-
-    VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = {};
-    inputAssemblyState.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-
-    VkPipelineRasterizationStateCreateInfo rasterizationState = {};
-    rasterizationState.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizationState.cullMode = VK_CULL_MODE_NONE;
-    rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterizationState.depthClampEnable = VK_FALSE;
-    rasterizationState.rasterizerDiscardEnable = VK_FALSE;
-    rasterizationState.depthBiasEnable = VK_FALSE;
-    rasterizationState.lineWidth = 1.0f;
-
-    VkPipelineColorBlendAttachmentState blendAttachmentState[1] = {};
-    blendAttachmentState[0].colorWriteMask = 0xf;
-    blendAttachmentState[0].blendEnable = VK_FALSE;
-    VkPipelineColorBlendStateCreateInfo colorBlendState = {};
-    colorBlendState.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlendState.attachmentCount = 1;
-    colorBlendState.pAttachments = blendAttachmentState;
-
-    VkPipelineViewportStateCreateInfo viewportState = {};
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount = 1;
-
-    const VkDynamicState dynamicStateEnables[] = {VK_DYNAMIC_STATE_VIEWPORT,
-                                                  VK_DYNAMIC_STATE_SCISSOR};
-    VkPipelineDynamicStateCreateInfo dynamicState = {};
-    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicState.pDynamicStates = dynamicStateEnables;
-    dynamicState.dynamicStateCount =
-        sizeof(dynamicStateEnables) / sizeof(*dynamicStateEnables);
-
-    VkPipelineDepthStencilStateCreateInfo depthStencilState = {};
-    depthStencilState.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencilState.depthTestEnable = VK_TRUE;
-    depthStencilState.depthWriteEnable = VK_TRUE;
-    depthStencilState.depthBoundsTestEnable = VK_FALSE;
-    depthStencilState.stencilTestEnable = VK_FALSE;
-    depthStencilState.depthCompareOp =
-        VK_COMPARE_OP_GREATER_OR_EQUAL;  // Unity/Vulkan uses reverse Z
-    depthStencilState.back.failOp = VK_STENCIL_OP_KEEP;
-    depthStencilState.back.passOp = VK_STENCIL_OP_KEEP;
-    depthStencilState.back.compareOp = VK_COMPARE_OP_ALWAYS;
-    depthStencilState.front = depthStencilState.back;
-
-    VkPipelineMultisampleStateCreateInfo multisampleState = {};
-    multisampleState.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisampleState.pSampleMask = NULL;
-
-    // Vertex:
-    // float3 vpos;
-    // byte4 vcol;
-    VkVertexInputBindingDescription vertexInputBinding = {};
-    vertexInputBinding.binding = 0;
-    vertexInputBinding.stride = 16;
-    vertexInputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-    VkVertexInputAttributeDescription vertexInputAttributes[2];
-    vertexInputAttributes[0].binding = 0;
-    vertexInputAttributes[0].location = 0;
-    vertexInputAttributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    vertexInputAttributes[0].offset = 0;
-    vertexInputAttributes[1].binding = 0;
-    vertexInputAttributes[1].location = 1;
-    vertexInputAttributes[1].format = VK_FORMAT_R8G8B8A8_UNORM;
-    vertexInputAttributes[1].offset = 12;
-
-    VkPipelineVertexInputStateCreateInfo vertexInputState = {};
-    vertexInputState.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputState.vertexBindingDescriptionCount = 1;
-    vertexInputState.pVertexBindingDescriptions = &vertexInputBinding;
-    vertexInputState.vertexAttributeDescriptionCount = 2;
-    vertexInputState.pVertexAttributeDescriptions = vertexInputAttributes;
-
-    pipelineCreateInfo.stageCount =
-        sizeof(shaderStages) / sizeof(*shaderStages);
-    pipelineCreateInfo.pStages = shaderStages;
-    pipelineCreateInfo.pVertexInputState = &vertexInputState;
-    pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
-    pipelineCreateInfo.pRasterizationState = &rasterizationState;
-    pipelineCreateInfo.pColorBlendState = &colorBlendState;
-    pipelineCreateInfo.pMultisampleState = &multisampleState;
-    pipelineCreateInfo.pViewportState = &viewportState;
-    pipelineCreateInfo.pDepthStencilState = &depthStencilState;
-    pipelineCreateInfo.pDynamicState = &dynamicState;
-
-    success =
-        vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCreateInfo,
-                                  NULL, &pipeline) == VK_SUCCESS;
-  }
-
-  if (shaderStages[0].module != VK_NULL_HANDLE)
-    vkDestroyShaderModule(device, shaderStages[0].module, NULL);
-  if (shaderStages[1].module != VK_NULL_HANDLE)
-    vkDestroyShaderModule(device, shaderStages[1].module, NULL);
-
-  return success ? pipeline : VK_NULL_HANDLE;
-}
-
-class RenderAPI_Vulkan : public RenderAPI {
+class TextureSubPluginAPI_Vulkan : public TextureSubPluginAPI {
  public:
-  RenderAPI_Vulkan();
-  virtual ~RenderAPI_Vulkan() {}
+  TextureSubPluginAPI_Vulkan();
+  virtual ~TextureSubPluginAPI_Vulkan() {}
 
   virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type,
                                   IUnityInterfaces* interfaces);
-  virtual bool GetUsesReverseZ() { return true; }
-  virtual void DrawSimpleTriangles(const float worldMatrix[16],
-                                   int triangleCount,
-                                   const void* verticesFloat3Byte4);
-  virtual void* BeginModifyTexture(void* textureHandle, int textureWidth,
-                                   int textureHeight, int* outRowPitch);
-  virtual void EndModifyTexture(void* textureHandle, int textureWidth,
-                                int textureHeight, int rowPitch, void* dataPtr);
-  virtual void* BeginModifyVertexBuffer(void* bufferHandle,
-                                        size_t* outBufferSize);
-  virtual void EndModifyVertexBuffer(void* bufferHandle);
+
+  virtual void CreateTexture3D(uint32_t width, uint32_t height, uint32_t depth,
+                               Format format, void*& texture){};
+
+  virtual void ClearTexture3D(void* texture_handle){};
+
+  virtual void TextureSubImage2D(void* texture_handle, int32_t xoffset,
+                                 int32_t yoffset, int32_t width, int32_t height,
+                                 void* data_ptr, int32_t level,
+                                 Format format){};
+
+  virtual void TextureSubImage3D(void* texture_handle, int32_t xoffset,
+                                 int32_t yoffset, int32_t zoffset,
+                                 int32_t width, int32_t height, int32_t depth,
+                                 void* data_ptr, int32_t level, Format format);
 
  private:
   typedef std::vector<VulkanBuffer> VulkanBuffers;
@@ -362,34 +197,27 @@ class RenderAPI_Vulkan : public RenderAPI {
   IUnityGraphicsVulkan* m_UnityVulkan;
   UnityVulkanInstance m_Instance;
   VulkanBuffer m_TextureStagingBuffer;
-  VulkanBuffer m_VertexStagingBuffer;
   std::map<unsigned long long, VulkanBuffers> m_DeleteQueue;
-  VkPipelineLayout m_TrianglePipelineLayout;
-  VkPipeline m_TrianglePipeline;
-  VkRenderPass m_TrianglePipelineRenderPass;
 };
 
-RenderAPI* CreateRenderAPI_Vulkan() { return new RenderAPI_Vulkan(); }
+TextureSubPluginAPI* CreateRenderAPI_Vulkan() {
+  return new TextureSubPluginAPI_Vulkan();
+}
 
-RenderAPI_Vulkan::RenderAPI_Vulkan()
-    : m_UnityVulkan(NULL),
-      m_TextureStagingBuffer(),
-      m_VertexStagingBuffer(),
-      m_TrianglePipelineLayout(VK_NULL_HANDLE),
-      m_TrianglePipeline(VK_NULL_HANDLE),
-      m_TrianglePipelineRenderPass(VK_NULL_HANDLE) {}
+TextureSubPluginAPI_Vulkan::TextureSubPluginAPI_Vulkan()
+    : m_UnityVulkan(NULL), m_TextureStagingBuffer() {}
 
-void RenderAPI_Vulkan::ProcessDeviceEvent(UnityGfxDeviceEventType type,
-                                          IUnityInterfaces* interfaces) {
+void TextureSubPluginAPI_Vulkan::ProcessDeviceEvent(
+    UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) {
   switch (type) {
-    case kUnityGfxDeviceEventInitialize:
+    case kUnityGfxDeviceEventInitialize: {
       m_UnityVulkan = interfaces->Get<IUnityGraphicsVulkan>();
       m_Instance = m_UnityVulkan->Instance();
 
       // Make sure Vulkan API functions are loaded
       LoadVulkanAPI(m_Instance.getInstanceProcAddr, m_Instance.instance);
 
-      UnityVulkanPluginEventConfig config_1;
+      UnityVulkanPluginEventConfig config_1{};
       config_1.graphicsQueueAccess = kUnityVulkanGraphicsQueueAccess_DontCare;
       config_1.renderPassPrecondition = kUnityVulkanRenderPass_EnsureInside;
       config_1.flags =
@@ -402,35 +230,24 @@ void RenderAPI_Vulkan::ProcessDeviceEvent(UnityGfxDeviceEventType type,
           "vkCmdBeginRenderPass",
           (PFN_vkVoidFunction)Hook_vkCmdBeginRenderPass);
       break;
-    case kUnityGfxDeviceEventShutdown:
-
+    }
+    case kUnityGfxDeviceEventShutdown: {
       if (m_Instance.device != VK_NULL_HANDLE) {
         GarbageCollect(true);
-        if (m_TrianglePipeline != VK_NULL_HANDLE) {
-          vkDestroyPipeline(m_Instance.device, m_TrianglePipeline, NULL);
-          m_TrianglePipeline = VK_NULL_HANDLE;
-        }
-        if (m_TrianglePipelineLayout != VK_NULL_HANDLE) {
-          vkDestroyPipelineLayout(m_Instance.device, m_TrianglePipelineLayout,
-                                  NULL);
-          m_TrianglePipelineLayout = VK_NULL_HANDLE;
-        }
       }
-
       m_UnityVulkan = NULL;
-      m_TrianglePipelineRenderPass = VK_NULL_HANDLE;
       m_Instance = UnityVulkanInstance();
-
       break;
+    }
   }
 }
 
-bool RenderAPI_Vulkan::CreateVulkanBuffer(size_t sizeInBytes,
-                                          VulkanBuffer* buffer,
-                                          VkBufferUsageFlags usage) {
+bool TextureSubPluginAPI_Vulkan::CreateVulkanBuffer(size_t sizeInBytes,
+                                                    VulkanBuffer* buffer,
+                                                    VkBufferUsageFlags usage) {
   if (sizeInBytes == 0) return false;
 
-  VkBufferCreateInfo bufferCreateInfo;
+  VkBufferCreateInfo bufferCreateInfo{};
   bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferCreateInfo.pNext = NULL;
   bufferCreateInfo.pQueueFamilyIndices = &m_Instance.queueFamilyIndex;
@@ -462,7 +279,7 @@ bool RenderAPI_Vulkan::CreateVulkanBuffer(size_t sizeInBytes,
     return false;
   }
 
-  VkMemoryAllocateInfo memoryAllocateInfo;
+  VkMemoryAllocateInfo memoryAllocateInfo{};
   memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
   memoryAllocateInfo.pNext = NULL;
   memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
@@ -494,7 +311,7 @@ bool RenderAPI_Vulkan::CreateVulkanBuffer(size_t sizeInBytes,
   return true;
 }
 
-void RenderAPI_Vulkan::ImmediateDestroyVulkanBuffer(
+void TextureSubPluginAPI_Vulkan::ImmediateDestroyVulkanBuffer(
     const VulkanBuffer& buffer) {
   if (buffer.buffer != VK_NULL_HANDLE)
     vkDestroyBuffer(m_Instance.device, buffer.buffer, NULL);
@@ -506,13 +323,13 @@ void RenderAPI_Vulkan::ImmediateDestroyVulkanBuffer(
     vkFreeMemory(m_Instance.device, buffer.deviceMemory, NULL);
 }
 
-void RenderAPI_Vulkan::SafeDestroy(unsigned long long frameNumber,
-                                   const VulkanBuffer& buffer) {
+void TextureSubPluginAPI_Vulkan::SafeDestroy(unsigned long long frameNumber,
+                                             const VulkanBuffer& buffer) {
   m_DeleteQueue[frameNumber].push_back(buffer);
 }
 
-void RenderAPI_Vulkan::GarbageCollect(bool force /*= false*/) {
-  UnityVulkanRecordingState recordingState;
+void TextureSubPluginAPI_Vulkan::GarbageCollect(bool force /*= false*/) {
+  UnityVulkanRecordingState recordingState{};
   if (force)
     recordingState.safeFrameNumber = ~0ull;
   else if (!m_UnityVulkan->CommandRecordingState(
@@ -530,174 +347,84 @@ void RenderAPI_Vulkan::GarbageCollect(bool force /*= false*/) {
   }
 }
 
-void RenderAPI_Vulkan::DrawSimpleTriangles(const float worldMatrix[16],
-                                           int triangleCount,
-                                           const void* verticesFloat3Byte4) {
-  // not needed, we already configured the event to be inside a render pass
-  //   m_UnityVulkan->EnsureInsideRenderPass();
-
+void TextureSubPluginAPI_Vulkan::TextureSubImage3D(
+    void* texture_handle, int32_t xoffset, int32_t yoffset, int32_t zoffset,
+    int32_t width, int32_t height, int32_t depth, void* data_ptr, int32_t level,
+    Format format) {
   UnityVulkanRecordingState recordingState;
   if (!m_UnityVulkan->CommandRecordingState(
-          &recordingState, kUnityVulkanGraphicsQueueAccess_DontCare))
+          &recordingState, kUnityVulkanGraphicsQueueAccess_DontCare)) {
+    std::ostringstream ss;
+    ss << __FUNCTION__
+       << " failed to intercept the current command buffer state";
+    UNITY_LOG_ERROR(g_Log, ss.str().c_str());
     return;
-
-  // Unity does not destroy render passes, so this is safe regarding ABA-problem
-  if (recordingState.renderPass != m_TrianglePipelineRenderPass) {
-    if (m_TrianglePipelineLayout == VK_NULL_HANDLE)
-      m_TrianglePipelineLayout =
-          CreateTrianglePipelineLayout(m_Instance.device);
-
-    m_TrianglePipeline =
-        CreateTrianglePipeline(m_Instance.device, m_TrianglePipelineLayout,
-                               recordingState.renderPass, VK_NULL_HANDLE);
-    m_TrianglePipelineRenderPass = recordingState.renderPass;
   }
-
-  if (m_TrianglePipeline != VK_NULL_HANDLE &&
-      m_TrianglePipelineLayout != VK_NULL_HANDLE) {
-    VulkanBuffer buffer;
-    if (!CreateVulkanBuffer(16 * 3 * triangleCount, &buffer,
-                            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT))
-      return;
-
-    memcpy(buffer.mapped, verticesFloat3Byte4,
-           static_cast<size_t>(buffer.sizeInBytes));
-    if (!(buffer.deviceMemoryFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
-      VkMappedMemoryRange range;
-      range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-      range.pNext = NULL;
-      range.memory = buffer.deviceMemory;
-      range.offset = 0;
-      range.size = buffer.deviceMemorySize;
-      vkFlushMappedMemoryRanges(m_Instance.device, 1, &range);
-    }
-
-    const VkDeviceSize offset = 0;
-    vkCmdBindVertexBuffers(recordingState.commandBuffer, 0, 1, &buffer.buffer,
-                           &offset);
-    vkCmdPushConstants(recordingState.commandBuffer, m_TrianglePipelineLayout,
-                       VK_SHADER_STAGE_VERTEX_BIT, 0, 64,
-                       (const void*)worldMatrix);
-    vkCmdBindPipeline(recordingState.commandBuffer,
-                      VK_PIPELINE_BIND_POINT_GRAPHICS, m_TrianglePipeline);
-    vkCmdDraw(recordingState.commandBuffer, triangleCount * 3, 1, 0, 0);
-
-    SafeDestroy(recordingState.currentFrameNumber, buffer);
-  }
-
-  GarbageCollect();
-}
-
-void* RenderAPI_Vulkan::BeginModifyTexture(void* textureHandle,
-                                           int textureWidth, int textureHeight,
-                                           int* outRowPitch) {
-  *outRowPitch = textureWidth * 4;
-  const size_t stagingBufferSizeRequirements = *outRowPitch * textureHeight;
-
-  UnityVulkanRecordingState recordingState;
-  if (!m_UnityVulkan->CommandRecordingState(
-          &recordingState, kUnityVulkanGraphicsQueueAccess_DontCare))
-    return NULL;
-
+  // safely (not necessarily immediately) destroy the current staging buffer
+  // before creating a new one. A staging buffer is simply a buffer in host
+  // (CPU) visible memory that we copy image data to which then a command on
+  // the client (GPU) copies a (sub)region from.
+  // TODO:  maybe we can check if requirements have changed. If not, then no
+  //        staging buffer recreation has to be done.
   SafeDestroy(recordingState.currentFrameNumber, m_TextureStagingBuffer);
+  size_t data_size;
+  switch (format) {
+    case R8_UINT:
+      data_size = static_cast<size_t>(width) * height * height;
+      break;
+    case R16_UINT:
+      data_size = static_cast<size_t>(width) * height * height * 2;
+      break;
+    default:
+      return;
+  }
   m_TextureStagingBuffer = VulkanBuffer();
-  if (!CreateVulkanBuffer(stagingBufferSizeRequirements,
-                          &m_TextureStagingBuffer,
-                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
-    return NULL;
+  if (!CreateVulkanBuffer(data_size, &m_TextureStagingBuffer,
+                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT)) {
+    std::ostringstream ss;
+    ss << __FUNCTION__
+       << " failed to create texture staging buffer";
+    UNITY_LOG_ERROR(g_Log, ss.str().c_str());
+    return;
+  }
+  memcpy(m_TextureStagingBuffer.mapped, data_ptr, data_size);
+  // vkUnmapMemory(m_Instance.device, m_TextureStagingBuffer.deviceMemory);
 
-  return m_TextureStagingBuffer.mapped;
-}
-
-void RenderAPI_Vulkan::EndModifyTexture(void* textureHandle, int textureWidth,
-                                        int textureHeight, int rowPitch,
-                                        void* dataPtr) {
   // cannot do resource uploads inside renderpass
   m_UnityVulkan->EnsureOutsideRenderPass();
 
+  // get the VkImage from the provided texture handle
   UnityVulkanImage image;
   if (!m_UnityVulkan->AccessTexture(
-          textureHandle, UnityVulkanWholeImage,
+          texture_handle, UnityVulkanWholeImage,
           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
           VK_ACCESS_TRANSFER_WRITE_BIT,
-          kUnityVulkanResourceAccess_PipelineBarrier, &image))
+          kUnityVulkanResourceAccess_PipelineBarrier, &image)) {
+    std::ostringstream ss;
+    ss << __FUNCTION__
+       << " failed to access texture from provided texture handle: "
+       << texture_handle;
+    UNITY_LOG_ERROR(g_Log, ss.str().c_str());
     return;
+  }
 
-  UnityVulkanRecordingState recordingState;
-  if (!m_UnityVulkan->CommandRecordingState(
-          &recordingState, kUnityVulkanGraphicsQueueAccess_DontCare))
-    return;
-
-  VkBufferImageCopy region;
+  VkBufferImageCopy region{};
   region.bufferImageHeight = 0;
   region.bufferRowLength = 0;
   region.bufferOffset = 0;
-  region.imageOffset.x = 0;
-  region.imageOffset.y = 0;
-  region.imageOffset.z = 0;
-  region.imageExtent.width = textureWidth;
-  region.imageExtent.height = textureHeight;
-  region.imageExtent.depth = 1;
+  region.imageOffset.x = xoffset;
+  region.imageOffset.y = yoffset;
+  region.imageOffset.z = zoffset;
+  region.imageExtent.width = width;
+  region.imageExtent.height = height;
+  region.imageExtent.depth = depth;
   region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   region.imageSubresource.baseArrayLayer = 0;
   region.imageSubresource.layerCount = 1;
-  region.imageSubresource.mipLevel = 0;
+  region.imageSubresource.mipLevel = static_cast<uint32_t>(level);
   vkCmdCopyBufferToImage(recordingState.commandBuffer,
                          m_TextureStagingBuffer.buffer, image.image,
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-}
-
-void* RenderAPI_Vulkan::BeginModifyVertexBuffer(void* bufferHandle,
-                                                size_t* outBufferSize) {
-  UnityVulkanRecordingState recordingState;
-  if (!m_UnityVulkan->CommandRecordingState(
-          &recordingState, kUnityVulkanGraphicsQueueAccess_DontCare))
-    return NULL;
-
-  UnityVulkanBuffer bufferInfo;
-  if (!m_UnityVulkan->AccessBuffer(bufferHandle, 0, 0,
-                                   kUnityVulkanResourceAccess_ObserveOnly,
-                                   &bufferInfo))
-    return NULL;
-
-  *outBufferSize = bufferInfo.sizeInBytes;
-
-  if (!bufferInfo.memory.mapped) return NULL;
-
-  // We don't want to start modifying a resource that might still be used by the
-  // GPU, so we can use kUnityVulkanResourceAccess_Recreate to recreate it while
-  // still keeping the old one alive if it's in use.
-  UnityVulkanBuffer recreatedBuffer;
-  if (!m_UnityVulkan->AccessBuffer(
-          bufferHandle, VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_WRITE_BIT,
-          kUnityVulkanResourceAccess_Recreate, &recreatedBuffer))
-    return NULL;
-
-  // We don't care about the previous contents of this vertex buffer so we can
-  // return the mapped pointer to the new resource memory
-  return recreatedBuffer.memory.mapped;
-}
-
-void RenderAPI_Vulkan::EndModifyVertexBuffer(void* bufferHandle) {
-  // cannot do resource uploads inside renderpass, but we know that the texture
-  // modification is done first and that already ends the renderpass
-  // m_UnityVulkan->EnsureOutsideRenderPass();
-
-  UnityVulkanBuffer buffer;
-  if (!m_UnityVulkan->AccessBuffer(
-          bufferHandle, 0, 0, kUnityVulkanResourceAccess_ObserveOnly, &buffer))
-    return;
-
-  if (!(buffer.memory.flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
-    VkMappedMemoryRange range;
-    range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-    range.pNext = NULL;
-    range.memory = buffer.memory.memory;
-    range.offset = buffer.memory.offset;  // size and offset also must be
-                                          // multiple of nonCoherentAtomSize
-    range.size = buffer.memory.size;
-    vkFlushMappedMemoryRanges(m_Instance.device, 1, &range);
-  }
 }
 
 #endif  // #if SUPPORT_VULKAN
