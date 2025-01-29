@@ -1,13 +1,12 @@
-#include "PlatformBase.hpp"
 #include "TextureSubPluginAPI.hpp"
 
 #if SUPPORT_VULKAN
 
 #include <math.h>
 #include <string.h>
-#include <sstream>
 
 #include <map>
+#include <sstream>
 #include <vector>
 
 // This plugin does not link to the Vulkan loader, easier to support multiple
@@ -30,17 +29,7 @@
   apply(vkQueueWaitIdle);                      \
   apply(vkDeviceWaitIdle);                     \
   apply(vkCmdCopyBufferToImage);               \
-  apply(vkFlushMappedMemoryRanges);            \
-  apply(vkCreatePipelineLayout);               \
-  apply(vkCreateShaderModule);                 \
-  apply(vkDestroyShaderModule);                \
-  apply(vkCreateGraphicsPipelines);            \
-  apply(vkCmdBindPipeline);                    \
-  apply(vkCmdDraw);                            \
-  apply(vkCmdPushConstants);                   \
-  apply(vkCmdBindVertexBuffers);               \
-  apply(vkDestroyPipeline);                    \
-  apply(vkDestroyPipelineLayout);
+  apply(vkFlushMappedMemoryRanges);
 
 #define VULKAN_DEFINE_API_FUNCPTR(func) static PFN_##func func
 VULKAN_DEFINE_API_FUNCPTR(vkGetInstanceProcAddr);
@@ -168,14 +157,14 @@ class TextureSubPluginAPI_Vulkan : public TextureSubPluginAPI {
                                   IUnityInterfaces* interfaces);
 
   virtual void CreateTexture3D(uint32_t width, uint32_t height, uint32_t depth,
-                               Format format, void*& texture){};
+                               Format format, void*& texture) {};
 
-  virtual void ClearTexture3D(void* texture_handle){};
+  virtual void ClearTexture3D(void* texture_handle) {};
 
   virtual void TextureSubImage2D(void* texture_handle, int32_t xoffset,
                                  int32_t yoffset, int32_t width, int32_t height,
                                  void* data_ptr, int32_t level,
-                                 Format format){};
+                                 Format format) {};
 
   virtual void TextureSubImage3D(void* texture_handle, int32_t xoffset,
                                  int32_t yoffset, int32_t zoffset,
@@ -239,6 +228,8 @@ void TextureSubPluginAPI_Vulkan::ProcessDeviceEvent(
       m_Instance = UnityVulkanInstance();
       break;
     }
+    default:
+      break;
   }
 }
 
@@ -382,8 +373,7 @@ void TextureSubPluginAPI_Vulkan::TextureSubImage3D(
   if (!CreateVulkanBuffer(data_size, &m_TextureStagingBuffer,
                           VK_BUFFER_USAGE_TRANSFER_SRC_BIT)) {
     std::ostringstream ss;
-    ss << __FUNCTION__
-       << " failed to create texture staging buffer";
+    ss << __FUNCTION__ << " failed to create texture staging buffer";
     UNITY_LOG_ERROR(g_Log, ss.str().c_str());
     return;
   }
@@ -404,6 +394,17 @@ void TextureSubPluginAPI_Vulkan::TextureSubImage3D(
     ss << __FUNCTION__
        << " failed to access texture from provided texture handle: "
        << texture_handle;
+    UNITY_LOG_ERROR(g_Log, ss.str().c_str());
+    return;
+  }
+
+  // since we have done a resource access, the previous CommandRecordingState is
+  // invalidated and has to be requested again
+  if (!m_UnityVulkan->CommandRecordingState(
+          &recordingState, kUnityVulkanGraphicsQueueAccess_DontCare)) {
+    std::ostringstream ss;
+    ss << __FUNCTION__
+       << " failed to intercept the current command buffer state";
     UNITY_LOG_ERROR(g_Log, ss.str().c_str());
     return;
   }

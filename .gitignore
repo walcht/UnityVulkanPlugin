@@ -402,3 +402,4 @@ build/
 
 # external dependencies
 extern/
+compile_commands.json
