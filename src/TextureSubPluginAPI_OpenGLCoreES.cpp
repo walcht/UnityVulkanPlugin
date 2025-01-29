@@ -60,7 +60,8 @@ class TextureSubPluginAPI_OpenGLCoreES : public TextureSubPluginAPI {
   UnityGfxRenderer m_APIType;
 };
 
-TextureSubPluginAPI* CreateRenderAPI_OpenGLCoreES(UnityGfxRenderer apiType) {
+TextureSubPluginAPI* CreateTextureSubPluginAPI_OpenGLCoreES(
+    UnityGfxRenderer apiType) {
   return new TextureSubPluginAPI_OpenGLCoreES(apiType);
 }
 

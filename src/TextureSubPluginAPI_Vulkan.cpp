@@ -189,7 +189,7 @@ class TextureSubPluginAPI_Vulkan : public TextureSubPluginAPI {
   std::map<unsigned long long, VulkanBuffers> m_DeleteQueue;
 };
 
-TextureSubPluginAPI* CreateRenderAPI_Vulkan() {
+TextureSubPluginAPI* CreateTextureSubPluginAPI_Vulkan() {
   return new TextureSubPluginAPI_Vulkan();
 }
 

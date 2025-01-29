@@ -38,7 +38,7 @@ class TextureSubPluginAPI_D3D11 : public TextureSubPluginAPI {
   ID3D11Device* m_Device;
 };
 
-TextureSubPluginAPI* CreateRenderAPI_D3D11() {
+TextureSubPluginAPI* CreateTextureSubPluginAPI_D3D11() {
   return new TextureSubPluginAPI_D3D11();
 }
 
