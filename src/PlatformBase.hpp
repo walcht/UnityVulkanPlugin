@@ -41,16 +41,10 @@
 // Which graphics device APIs we possibly support?
 #if UNITY_METRO
 #define SUPPORT_D3D11 1
-#if WINDOWS_UWP
-#define SUPPORT_D3D12 1
-#endif
 #elif UNITY_WIN
-#define SUPPORT_D3D11 \
-  1  // comment this out if you don't have D3D11 header/library files
-#define SUPPORT_D3D12 \
-  0  // comment this out if you don't have D3D12 header/library files
-#define SUPPORT_OPENGL_UNIFIED 0
-#define SUPPORT_OPENGL_CORE 0
+#define SUPPORT_D3D11 1
+#define SUPPORT_OPENGL_UNIFIED 1
+#define SUPPORT_OPENGL_CORE 1
 #define SUPPORT_VULKAN 1  // Requires Vulkan SDK to be installed
 #elif UNITY_IOS || UNITY_TVOS || UNITY_ANDROID || UNITY_WEBGL
 #ifndef SUPPORT_OPENGL_ES
@@ -58,7 +52,7 @@
 #endif
 #define SUPPORT_OPENGL_UNIFIED SUPPORT_OPENGL_ES
 #ifndef SUPPORT_VULKAN
-#define SUPPORT_VULKAN 0
+#define SUPPORT_VULKAN 1
 #endif
 #elif UNITY_OSX || UNITY_LINUX
 #define SUPPORT_OPENGL_UNIFIED 1
@@ -67,15 +61,11 @@
 #define SUPPORT_OPENGL_UNIFIED 1
 #define SUPPORT_OPENGL_ES 1
 #ifndef SUPPORT_VULKAN
-#define SUPPORT_VULKAN 0
+#define SUPPORT_VULKAN 1
 #endif
 #elif UNITY_QNX
 #define SUPPORT_OPENGL_UNIFIED 1
 #define SUPPORT_OPENGL_ES 1
-#endif
-
-#if UNITY_IOS || UNITY_TVOS || UNITY_OSX
-#define SUPPORT_METAL 1
 #endif
 
 // COM-like Release macro

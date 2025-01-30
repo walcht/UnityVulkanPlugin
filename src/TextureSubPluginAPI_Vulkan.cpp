@@ -1,5 +1,5 @@
 #include "TextureSubPluginAPI.hpp"
-
+#define SUPPORT_VULKAN 1
 #if SUPPORT_VULKAN
 
 #include <math.h>
@@ -422,7 +422,7 @@ void TextureSubPluginAPI_Vulkan::TextureSubImage3D(
   region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   region.imageSubresource.baseArrayLayer = 0;
   region.imageSubresource.layerCount = 1;
-  region.imageSubresource.mipLevel = static_cast<uint32_t>(level);
+  region.imageSubresource.mipLevel = level;
   vkCmdCopyBufferToImage(recordingState.commandBuffer,
                          m_TextureStagingBuffer.buffer, image.image,
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);

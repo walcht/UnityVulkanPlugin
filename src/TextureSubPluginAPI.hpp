@@ -74,4 +74,4 @@ class TextureSubPluginAPI {
 /// @param apiType Graphics API type. Currently only: kUnityGfxRendererD3D11 and
 /// kUnityGfxRendererOpenGLCore are supported
 /// @return to the created render API
-TextureSubPluginAPI* CreateRenderAPI(UnityGfxRenderer apiType);
+TextureSubPluginAPI* CreateTextureSubPluginAPI(UnityGfxRenderer apiType);

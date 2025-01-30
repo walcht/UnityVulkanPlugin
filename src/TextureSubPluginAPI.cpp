@@ -8,6 +8,7 @@ IUnityGraphics* g_Graphics = NULL;
 IUnityLog* g_Log = NULL;
 
 TextureSubPluginAPI* CreateTextureSubPluginAPI(UnityGfxRenderer apiType) {
+
 #if SUPPORT_D3D11
   if (apiType == kUnityGfxRendererD3D11) {
     extern TextureSubPluginAPI* CreateTextureSubPluginAPI_D3D11();

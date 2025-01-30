@@ -1,8 +1,11 @@
 #include <assert.h>
 #include <math.h>
 
+#include <unordered_map>
+
 #include "PlatformBase.hpp"
 #include "TextureSubPluginAPI.hpp"
+#include "Unity/IUnityLog.h"
 
 enum Event {
   TextureSubImage2D = 0,
@@ -10,6 +13,11 @@ enum Event {
   CreateTexture3D = 2,
   ClearTexture3D = 3
 };
+
+// global state
+static TextureSubPluginAPI* s_CurrentAPI = NULL;
+static UnityGfxRenderer s_DeviceType = kUnityGfxRendererNull;
+static std::unordered_map<uint32_t, void*> g_CreatedTextures;
 
 static void UNITY_INTERFACE_API
 OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType);
@@ -26,12 +34,13 @@ UnityPluginLoad(IUnityInterfaces* unityInterfaces) {
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
+  // clear created textures
+  for (auto it = g_CreatedTextures.begin(); it != g_CreatedTextures.end();) {
+    // this is not run in render thread => might crash?
+    s_CurrentAPI->ClearTexture3D(it->second);
+  }
   g_Graphics->UnregisterDeviceEventCallback(OnGraphicsDeviceEvent);
 }
-
-// GraphicsDeviceEvent
-static TextureSubPluginAPI* s_CurrentAPI = NULL;
-static UnityGfxRenderer s_DeviceType = kUnityGfxRendererNull;
 
 static void UNITY_INTERFACE_API
 OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType) {
@@ -39,7 +48,7 @@ OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType) {
   if (eventType == kUnityGfxDeviceEventInitialize) {
     assert(s_CurrentAPI == NULL);
     s_DeviceType = g_Graphics->GetRenderer();
-    s_CurrentAPI = CreateRenderAPI(s_DeviceType);
+    s_CurrentAPI = CreateTextureSubPluginAPI(s_DeviceType);
   }
 
   // Let the implementation process the device related events
@@ -80,6 +89,7 @@ struct TextureSubImage3DParams {
 };
 
 struct CreateTexture3DParams {
+  uint32_t texture_id;
   uint32_t width;
   uint32_t height;
   uint32_t depth;
@@ -87,94 +97,53 @@ struct CreateTexture3DParams {
 };
 
 struct ClearTexture3DParams {
-  void* texture_handle;
+  uint32_t texture_id;
 };
 
-// global state parameters
-static TextureSubImage2DParams g_TextureSubImage2DParams;
-static TextureSubImage3DParams g_TextureSubImage3DParams;
-static CreateTexture3DParams g_CreateTexture3DParams;
-static ClearTexture3DParams g_ClearTexture3DParams;
-static void* g_Texture3D = NULL;
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-UpdateTextureSubImage2DParams(void* texture_handle, int32_t xoffset,
-                              int32_t yoffset, int32_t width, int32_t height,
-                              void* data_ptr, int32_t level, Format format) {
-  g_TextureSubImage2DParams.texture_handle = texture_handle;
-  g_TextureSubImage2DParams.xoffset = xoffset;
-  g_TextureSubImage2DParams.yoffset = yoffset;
-  g_TextureSubImage2DParams.width = width;
-  g_TextureSubImage2DParams.height = height;
-  g_TextureSubImage2DParams.data_ptr = data_ptr;
-  g_TextureSubImage2DParams.level = level;
-  g_TextureSubImage2DParams.format = format;
-}
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-UpdateTextureSubImage3DParams(void* texture_handle, int32_t xoffset,
-                              int32_t yoffset, int32_t zoffset, int32_t width,
-                              int32_t height, int32_t depth, void* data_ptr,
-                              int32_t level, Format format) {
-  g_TextureSubImage3DParams.texture_handle = texture_handle;
-  g_TextureSubImage3DParams.xoffset = xoffset;
-  g_TextureSubImage3DParams.yoffset = yoffset;
-  g_TextureSubImage3DParams.zoffset = zoffset;
-  g_TextureSubImage3DParams.width = width;
-  g_TextureSubImage3DParams.height = height;
-  g_TextureSubImage3DParams.depth = depth;
-  g_TextureSubImage3DParams.data_ptr = data_ptr;
-  g_TextureSubImage3DParams.level = level;
-  g_TextureSubImage3DParams.format = format;
-}
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-UpdateCreateTexture3DParams(uint32_t width, uint32_t height, uint32_t depth,
-                            Format format) {
-  g_CreateTexture3DParams.width = width;
-  g_CreateTexture3DParams.height = height;
-  g_CreateTexture3DParams.depth = depth;
-  g_CreateTexture3DParams.format = format;
-}
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-UpdateClearTexture3DParams(void* texture_handle) {
-  g_ClearTexture3DParams.texture_handle = texture_handle;
-}
-
-static void UNITY_INTERFACE_API OnRenderEvent(int eventID) {
+static void UNITY_INTERFACE_API OnRenderEvent(int eventID, void* data) {
   // Unknown / unsupported graphics device type? Do nothing
   if (s_CurrentAPI == NULL) return;
 
   switch ((Event)eventID) {
     case Event::TextureSubImage2D: {
+      auto args = static_cast<TextureSubImage2DParams*>(data);
       s_CurrentAPI->TextureSubImage2D(
-          g_TextureSubImage2DParams.texture_handle,
-          g_TextureSubImage2DParams.xoffset, g_TextureSubImage2DParams.yoffset,
-          g_TextureSubImage2DParams.width, g_TextureSubImage2DParams.height,
-          g_TextureSubImage2DParams.data_ptr, g_TextureSubImage2DParams.level,
-          g_TextureSubImage2DParams.format);
+          args->texture_handle, args->xoffset, args->yoffset, args->width,
+          args->height, args->data_ptr, args->level, args->format);
       break;
     }
     case Event::TextureSubImage3D: {
-      s_CurrentAPI->TextureSubImage3D(
-          g_TextureSubImage3DParams.texture_handle,
-          g_TextureSubImage3DParams.xoffset, g_TextureSubImage3DParams.yoffset,
-          g_TextureSubImage3DParams.zoffset, g_TextureSubImage3DParams.width,
-          g_TextureSubImage3DParams.height, g_TextureSubImage3DParams.depth,
-          g_TextureSubImage3DParams.data_ptr, g_TextureSubImage3DParams.level,
-          g_TextureSubImage3DParams.format);
+      auto args = static_cast<TextureSubImage3DParams*>(data);
+      s_CurrentAPI->TextureSubImage3D(args->texture_handle, args->xoffset,
+                                      args->yoffset, args->zoffset, args->width,
+                                      args->height, args->depth, args->data_ptr,
+                                      args->level, args->format);
       break;
     }
     case Event::CreateTexture3D: {
-      s_CurrentAPI->CreateTexture3D(
-          g_CreateTexture3DParams.width, g_CreateTexture3DParams.height,
-          g_CreateTexture3DParams.depth, g_CreateTexture3DParams.format,
-          g_Texture3D);
+      auto args = static_cast<CreateTexture3DParams*>(data);
+      if (auto search = g_CreatedTextures.find(args->texture_id);
+          search != g_CreatedTextures.end()) {
+        UNITY_LOG_ERROR(
+            g_Log, "a texture with the provided texture ID already exists!");
+        return;
+      }
+      g_CreatedTextures[args->texture_id] = nullptr;
+      s_CurrentAPI->CreateTexture3D(args->width, args->height, args->depth,
+                                    args->format,
+                                    g_CreatedTextures[args->texture_id]);
       break;
     }
     case Event::ClearTexture3D: {
-      s_CurrentAPI->ClearTexture3D(g_ClearTexture3DParams.texture_handle);
+      auto args = static_cast<ClearTexture3DParams*>(data);
+      if (auto search = g_CreatedTextures.find(args->texture_id);
+          search != g_CreatedTextures.end()) {
+        s_CurrentAPI->ClearTexture3D(search->second);
+        g_CreatedTextures.erase(search);
+        return;
+      }
+      UNITY_LOG_ERROR(g_Log,
+                      "no texture was created with the provided texture ID");
       break;
     }
     default:
@@ -182,12 +151,17 @@ static void UNITY_INTERFACE_API OnRenderEvent(int eventID) {
   }
 }
 
-extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 GetRenderEventFunc() {
   return OnRenderEvent;
 }
 
 extern "C" UNITY_INTERFACE_EXPORT void* UNITY_INTERFACE_API
-RetrieveCreatedTexture3D() {
-  return g_Texture3D;
+RetrieveCreatedTexture3D(uint32_t texture_id) {
+  if (auto search = g_CreatedTextures.find(texture_id);
+      search != g_CreatedTextures.end()) {
+    return search->second;
+  }
+  UNITY_LOG_ERROR(g_Log, "no texture was created with the provided texture ID");
+  return nullptr;
 }

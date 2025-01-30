@@ -79,7 +79,7 @@ void TextureSubPluginAPI_D3D11::TextureSubImage2D(
 
   // make sure to set front and back such that front < back
   // even if they are not needed so that this works
-  D3D11_BOX box;
+  D3D11_BOX box{};
   box.left = xoffset;
   box.top = yoffset;
   box.front = 0;

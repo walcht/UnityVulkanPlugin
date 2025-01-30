@@ -12,6 +12,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(SOURCES ${SOURCES} extern/glad/glad.c)
 endif()
 add_library(TextureSubPlugin SHARED ${SOURCES})
+set_property(TARGET TextureSubPlugin PROPERTY CXX_STANDARD 17)
 target_include_directories(TextureSubPlugin PRIVATE include/ src/)
 target_include_directories(TextureSubPlugin
     PUBLIC
@@ -20,17 +21,17 @@ target_include_directories(TextureSubPlugin
 # compiler flags (CXXFLAGS)
 target_compile_definitions(TextureSubPlugin
     PRIVATE
-        -DSUPPORT_VULKAN=1
-    #    -DSUPPORT_OPENGL_UNIFIED=1
-        -DUNITY_LINUX=1
+    #   -DSUPPORT_VULKAN=1
+    #   -DSUPPORT_OPENGL_UNIFIED=1
+    #   -DUNITY_LINUX=1
 )
 if (NOT MSVC)
     target_compile_options(TextureSubPlugin PRIVATE -O2 -fPIC)
 endif()
 # find OpenGL and link against it
-# find_package(OpenGL REQUIRED)
+find_package(OpenGL REQUIRED)
 find_package(Vulkan REQUIRED)
 target_link_libraries(TextureSubPlugin
-    # OpenGL::GL
+    OpenGL::GL
     Vulkan::Vulkan
 )
