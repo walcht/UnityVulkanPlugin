@@ -1,9 +1,6 @@
 #include <assert.h>
 #include <math.h>
 
-#include <unordered_map>
-
-#include "PlatformBase.hpp"
 #include "TextureSubPluginAPI.hpp"
 #include "Unity/IUnityLog.h"
 
@@ -11,58 +8,8 @@ enum Event {
   TextureSubImage2D = 0,
   TextureSubImage3D = 1,
   CreateTexture3D = 2,
-  ClearTexture3D = 3
+  DestroyTexture3D = 3
 };
-
-// global state
-static TextureSubPluginAPI* s_CurrentAPI = NULL;
-static UnityGfxRenderer s_DeviceType = kUnityGfxRendererNull;
-static std::unordered_map<uint32_t, void*> g_CreatedTextures;
-
-static void UNITY_INTERFACE_API
-OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType);
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-UnityPluginLoad(IUnityInterfaces* unityInterfaces) {
-  g_UnityInterfaces = unityInterfaces;
-  g_Graphics = g_UnityInterfaces->Get<IUnityGraphics>();
-  g_Graphics->RegisterDeviceEventCallback(OnGraphicsDeviceEvent);
-  g_Log = g_UnityInterfaces->Get<IUnityLog>();
-
-  // Run OnGraphicsDeviceEvent(initialize) manually on plugin load
-  OnGraphicsDeviceEvent(kUnityGfxDeviceEventInitialize);
-}
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
-  // clear created textures
-  for (auto it = g_CreatedTextures.begin(); it != g_CreatedTextures.end();) {
-    // this is not run in render thread => might crash?
-    s_CurrentAPI->ClearTexture3D(it->second);
-  }
-  g_Graphics->UnregisterDeviceEventCallback(OnGraphicsDeviceEvent);
-}
-
-static void UNITY_INTERFACE_API
-OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType) {
-  // Create graphics API implementation upon initialization
-  if (eventType == kUnityGfxDeviceEventInitialize) {
-    assert(s_CurrentAPI == NULL);
-    s_DeviceType = g_Graphics->GetRenderer();
-    s_CurrentAPI = CreateTextureSubPluginAPI(s_DeviceType);
-  }
-
-  // Let the implementation process the device related events
-  if (s_CurrentAPI) {
-    s_CurrentAPI->ProcessDeviceEvent(eventType, g_UnityInterfaces);
-  }
-
-  // Cleanup graphics API implementation upon shutdown
-  if (eventType == kUnityGfxDeviceEventShutdown) {
-    delete s_CurrentAPI;
-    s_CurrentAPI = NULL;
-    s_DeviceType = kUnityGfxRendererNull;
-  }
-}
 
 struct TextureSubImage2DParams {
   void* texture_handle;
@@ -96,9 +43,53 @@ struct CreateTexture3DParams {
   Format format;
 };
 
-struct ClearTexture3DParams {
+struct DestroyTexture3DParams {
   uint32_t texture_id;
 };
+
+// global state
+static TextureSubPluginAPI* s_CurrentAPI = NULL;
+static UnityGfxRenderer s_DeviceType = kUnityGfxRendererNull;
+
+static void UNITY_INTERFACE_API
+OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType);
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+UnityPluginLoad(IUnityInterfaces* unityInterfaces) {
+  g_UnityInterfaces = unityInterfaces;
+  g_Graphics = g_UnityInterfaces->Get<IUnityGraphics>();
+  g_Graphics->RegisterDeviceEventCallback(OnGraphicsDeviceEvent);
+  g_Log = g_UnityInterfaces->Get<IUnityLog>();
+
+  // Run OnGraphicsDeviceEvent(initialize) manually on plugin load
+  OnGraphicsDeviceEvent(kUnityGfxDeviceEventInitialize);
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload() {
+  g_Graphics->UnregisterDeviceEventCallback(OnGraphicsDeviceEvent);
+}
+
+static void UNITY_INTERFACE_API
+OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType) {
+  // Create graphics API implementation upon initialization
+  if (eventType == kUnityGfxDeviceEventInitialize) {
+    assert(s_CurrentAPI == NULL);
+    s_DeviceType = g_Graphics->GetRenderer();
+    s_CurrentAPI = CreateTextureSubPluginAPI(s_DeviceType);
+  }
+
+  // Let the implementation process the device related events
+  if (s_CurrentAPI) {
+    s_CurrentAPI->ProcessDeviceEvent(eventType, g_UnityInterfaces);
+  }
+
+  // Cleanup graphics API implementation upon shutdown
+  if (eventType == kUnityGfxDeviceEventShutdown) {
+    delete s_CurrentAPI;
+    s_CurrentAPI = NULL;
+    s_DeviceType = kUnityGfxRendererNull;
+  }
+}
 
 static void UNITY_INTERFACE_API OnRenderEvent(int eventID, void* data) {
   // Unknown / unsupported graphics device type? Do nothing
@@ -122,29 +113,13 @@ static void UNITY_INTERFACE_API OnRenderEvent(int eventID, void* data) {
     }
     case Event::CreateTexture3D: {
       auto args = static_cast<CreateTexture3DParams*>(data);
-      if (auto search = g_CreatedTextures.find(args->texture_id);
-          search != g_CreatedTextures.end()) {
-        UNITY_LOG_ERROR(
-            g_Log, "a texture with the provided texture ID already exists!");
-        return;
-      }
-      g_CreatedTextures[args->texture_id] = nullptr;
-      s_CurrentAPI->CreateTexture3D(args->width, args->height, args->depth,
-                                    args->format,
-                                    g_CreatedTextures[args->texture_id]);
+      s_CurrentAPI->CreateTexture3D(args->texture_id, args->width, args->height,
+                                    args->depth, args->format);
       break;
     }
-    case Event::ClearTexture3D: {
-      auto args = static_cast<ClearTexture3DParams*>(data);
-      if (auto search = g_CreatedTextures.find(args->texture_id);
-          search != g_CreatedTextures.end()) {
-        s_CurrentAPI->ClearTexture3D(search->second);
-        g_CreatedTextures.erase(search);
-        return;
-      }
-      UNITY_LOG_ERROR(g_Log,
-                      "no texture was created with the provided texture ID");
-      break;
+    case Event::DestroyTexture3D: {
+      auto args = static_cast<DestroyTexture3DParams*>(data);
+      s_CurrentAPI->DestroyTexture3D(args->texture_id);
     }
     default:
       break;
@@ -158,10 +133,6 @@ GetRenderEventFunc() {
 
 extern "C" UNITY_INTERFACE_EXPORT void* UNITY_INTERFACE_API
 RetrieveCreatedTexture3D(uint32_t texture_id) {
-  if (auto search = g_CreatedTextures.find(texture_id);
-      search != g_CreatedTextures.end()) {
-    return search->second;
-  }
-  UNITY_LOG_ERROR(g_Log, "no texture was created with the provided texture ID");
-  return nullptr;
+  if (s_CurrentAPI == NULL) return nullptr;
+  return s_CurrentAPI->RetrieveCreatedTexture3D(texture_id);
 }

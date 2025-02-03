@@ -3,8 +3,11 @@
 
 #if SUPPORT_D3D11
 
+#include <ostream>
+#include <unordered_map>
 #include <assert.h>
 #include <d3d11.h>
+
 
 #include <sstream>
 #include <string>
@@ -17,13 +20,12 @@ class TextureSubPluginAPI_D3D11 : public TextureSubPluginAPI {
   TextureSubPluginAPI_D3D11();
   virtual ~TextureSubPluginAPI_D3D11() {}
 
-  virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type,
-                                  IUnityInterfaces* interfaces);
+  virtual void CreateTexture3D(uint32_t texture_id, uint32_t width,
+                               uint32_t height, uint32_t depth, Format format);
 
-  virtual void CreateTexture3D(uint32_t width, uint32_t height, uint32_t depth,
-                               Format format, void*& texture);
+  virtual void* RetrieveCreatedTexture3D(uint32_t texture_id);
 
-  virtual void ClearTexture3D(void* texture_handle);
+  virtual void DestroyTexture3D(uint32_t texture_id);
 
   virtual void TextureSubImage2D(void* texture_handle, int32_t xoffset,
                                  int32_t yoffset, int32_t width, int32_t height,
@@ -34,8 +36,12 @@ class TextureSubPluginAPI_D3D11 : public TextureSubPluginAPI {
                                  int32_t width, int32_t height, int32_t depth,
                                  void* data_ptr, int32_t level, Format format);
 
+  virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type,
+                                  IUnityInterfaces* interfaces);
+
  private:
   ID3D11Device* m_Device;
+  std::unordered_map<uint32_t, ID3D11Texture3D*> m_CreatedTextures;
 };
 
 TextureSubPluginAPI* CreateTextureSubPluginAPI_D3D11() {
@@ -52,6 +58,8 @@ void TextureSubPluginAPI_D3D11::ProcessDeviceEvent(
       m_Device = d3d->GetDevice();
       break;
     }
+    default:
+      break;
   }
 }
 
@@ -67,9 +75,12 @@ void TextureSubPluginAPI_D3D11::TextureSubImage2D(
     case Format::R16_UINT:
       row_pitch = width * 2;  // width * sizeof(uint16_t)
       break;
-    default:
+    default: {
+      std::ostringstream ss;
+      ss << __FUNCTION__ << " unsupported texture format: " << format;
+      UNITY_LOG_ERROR(g_Log, ss.str().c_str());
       return;
-      break;
+    }
   }
 
   ID3D11Texture2D* d3dtex = (ID3D11Texture2D*)texture_handle;
@@ -104,9 +115,12 @@ void TextureSubPluginAPI_D3D11::TextureSubImage3D(
     case Format::R16_UINT:
       row_pitch = width * 2;  // width * sizeof(uint16_t)
       break;
-    default:
+    default: {
+      std::ostringstream ss;
+      ss << __FUNCTION__ << " unsupported texture format: " << format;
+      UNITY_LOG_ERROR(g_Log, ss.str().c_str());
       return;
-      break;
+    }
   }
 
   uint32_t depth_pitch = height * row_pitch;
@@ -128,9 +142,9 @@ void TextureSubPluginAPI_D3D11::TextureSubImage3D(
 }
 
 // google: direct3d 11 resources limits
-void TextureSubPluginAPI_D3D11::CreateTexture3D(uint32_t width, uint32_t height,
-                                                uint32_t depth, Format format,
-                                                void*& texture) {
+void TextureSubPluginAPI_D3D11::CreateTexture3D(uint32_t texture_id,
+                                                uint32_t width, uint32_t height,
+                                                uint32_t depth, Format format) {
   uint32_t size_in_bytes;
   D3D11_TEXTURE3D_DESC desc;
   desc.Width = width;
@@ -146,10 +160,14 @@ void TextureSubPluginAPI_D3D11::CreateTexture3D(uint32_t width, uint32_t height,
       desc.Format = DXGI_FORMAT_R16_UNORM;
       size_in_bytes = width * height * depth * 2;
       break;
-    default:
-      texture = NULL;
+    default: {
+      std::ostringstream ss;
+      ss << __FUNCTION__
+         << "failed to create 3D texture, unsupported texture format: "
+         << format;
+      UNITY_LOG_ERROR(g_Log, ss.str().c_str());
       return;
-      break;
+    }
   }
   desc.Usage = D3D11_USAGE_DEFAULT;
   desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -164,7 +182,6 @@ void TextureSubPluginAPI_D3D11::CreateTexture3D(uint32_t width, uint32_t height,
         << " Max: " << D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_C_TERM
         << "MB";
     UNITY_LOG_ERROR(g_Log, msg.str().c_str());
-    texture = NULL;
     return;
   }
 
@@ -177,22 +194,37 @@ void TextureSubPluginAPI_D3D11::CreateTexture3D(uint32_t width, uint32_t height,
     std::ostringstream msg;
     msg << "CreateTexture3D failed, return code: 0x" << std::hex << result;
     UNITY_LOG_ERROR(g_Log, msg.str().c_str());
-    texture = NULL;
     return;
   }
   std::ostringstream address;
   address << "created texture 3D ID3D11Texture3D ptr: 0x" << std::hex << d3dtex;
   UNITY_LOG(g_Log, address.str().c_str());
 
-  texture = d3dtex;
+  // store created texture handle
+  m_CreatedTextures.emplace(std::make_pair(texture_id, d3dtex));
+
   ctx->Release();
 }
 
-void TextureSubPluginAPI_D3D11::ClearTexture3D(void* texture_handle) {
-  ID3D11Texture3D* d3dtex = (ID3D11Texture3D*)texture_handle;
-  assert(d3dtex);
-  // TODO: is this the correct way to release a resource in Direct3D 11?
-  // d3dtex->Release();
+void* TextureSubPluginAPI_D3D11::RetrieveCreatedTexture3D(
+    uint32_t texture_id) {
+  if (auto search = m_CreatedTextures.find(texture_id);
+      search != m_CreatedTextures.end()) {
+    return search->second.first;
+  }
+  UNITY_LOG_ERROR(g_Log, "no texture was created with the provided texture ID");
+  return nullptr;
+}
+
+void TextureSubPluginAPI_D3D11::DestroyTexture3D(uint32_t texture_id) {
+  if (auto search = m_CreatedTextures.find(texture_id);
+      search != m_CreatedTextures.end()) {
+    search->second->Release();
+    return;
+  }
+  UNITY_LOG_ERROR(g_Log,
+                  "failed to destroy texture 3D (texture ID does not refer to "
+                  "a created texture 3D)");
 }
 
 #endif  // #if SUPPORT_D3D11

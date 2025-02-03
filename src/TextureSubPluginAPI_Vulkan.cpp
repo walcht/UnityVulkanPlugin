@@ -1,3 +1,5 @@
+#include <unordered_map>
+
 #include "TextureSubPluginAPI.hpp"
 #define SUPPORT_VULKAN 1
 #if SUPPORT_VULKAN
@@ -18,12 +20,16 @@
   apply(vkCreateInstance);                     \
   apply(vkCmdBeginRenderPass);                 \
   apply(vkCreateBuffer);                       \
+  apply(vkCreateImage);                        \
   apply(vkGetPhysicalDeviceMemoryProperties);  \
+  apply(vkGetImageMemoryRequirements);         \
   apply(vkGetBufferMemoryRequirements);        \
   apply(vkMapMemory);                          \
   apply(vkBindBufferMemory);                   \
+  apply(vkBindImageMemory);                    \
   apply(vkAllocateMemory);                     \
   apply(vkDestroyBuffer);                      \
+  apply(vkDestroyImage);                       \
   apply(vkFreeMemory);                         \
   apply(vkUnmapMemory);                        \
   apply(vkQueueWaitIdle);                      \
@@ -35,6 +41,63 @@
 VULKAN_DEFINE_API_FUNCPTR(vkGetInstanceProcAddr);
 UNITY_USED_VULKAN_API_FUNCTIONS(VULKAN_DEFINE_API_FUNCPTR);
 #undef VULKAN_DEFINE_API_FUNCPTR
+
+struct VulkanBuffer {
+  VkBuffer buffer;
+  VkDeviceMemory deviceMemory;
+  void* mapped;
+  VkDeviceSize sizeInBytes;
+  VkDeviceSize deviceMemorySize;
+  VkMemoryPropertyFlags deviceMemoryFlags;
+};
+
+class TextureSubPluginAPI_Vulkan : public TextureSubPluginAPI {
+ public:
+  TextureSubPluginAPI_Vulkan();
+  virtual ~TextureSubPluginAPI_Vulkan() {}
+
+  virtual void CreateTexture3D(uint32_t texture_id, uint32_t width,
+                               uint32_t height, uint32_t depth, Format format);
+
+  virtual void* RetrieveCreatedTexture3D(uint32_t texture_id);
+
+  virtual void DestroyTexture3D(uint32_t texture_id);
+
+  // TODO: implement TextureSubImage2D for Vulkan API
+  virtual void TextureSubImage2D(void* texture_handle, int32_t xoffset,
+                                 int32_t yoffset, int32_t width, int32_t height,
+                                 void* data_ptr, int32_t level, Format format) {
+  }
+
+  virtual void TextureSubImage3D(void* texture_handle, int32_t xoffset,
+                                 int32_t yoffset, int32_t zoffset,
+                                 int32_t width, int32_t height, int32_t depth,
+                                 void* data_ptr, int32_t level, Format format);
+
+  virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type,
+                                  IUnityInterfaces* interfaces);
+
+ private:
+  typedef std::vector<VulkanBuffer> VulkanBuffers;
+  typedef std::map<unsigned long long, VulkanBuffers> DeleteQueue;
+
+ private:
+  bool CreateVulkanBuffer(size_t bytes, VulkanBuffer* buffer,
+                          VkBufferUsageFlags usage);
+  int32_t FindMemoryType(uint32_t typeFilter,
+                         VkMemoryPropertyFlags properties) const;
+  void ImmediateDestroyVulkanBuffer(const VulkanBuffer& buffer);
+  void SafeDestroy(unsigned long long frameNumber, const VulkanBuffer& buffer);
+  void GarbageCollect(bool force = false);
+
+ private:
+  IUnityGraphicsVulkan* m_UnityVulkan;
+  UnityVulkanInstance m_Instance;
+  VulkanBuffer m_TextureStagingBuffer;
+  std::map<unsigned long long, VulkanBuffers> m_DeleteQueue;
+  std::unordered_map<uint32_t, std::pair<VkImage, VkDeviceMemory>>
+      m_CreatedTextures;
+};
 
 static void LoadVulkanAPI(PFN_vkGetInstanceProcAddr getInstanceProcAddr,
                           VkInstance instance) {
@@ -138,56 +201,6 @@ extern "C" void RenderAPI_Vulkan_OnPluginLoad(IUnityInterfaces* interfaces) {
     vulkanInterface->InterceptInitialization(InterceptVulkanInitialization,
                                              NULL);
 }
-
-struct VulkanBuffer {
-  VkBuffer buffer;
-  VkDeviceMemory deviceMemory;
-  void* mapped;
-  VkDeviceSize sizeInBytes;
-  VkDeviceSize deviceMemorySize;
-  VkMemoryPropertyFlags deviceMemoryFlags;
-};
-
-class TextureSubPluginAPI_Vulkan : public TextureSubPluginAPI {
- public:
-  TextureSubPluginAPI_Vulkan();
-  virtual ~TextureSubPluginAPI_Vulkan() {}
-
-  virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type,
-                                  IUnityInterfaces* interfaces);
-
-  virtual void CreateTexture3D(uint32_t width, uint32_t height, uint32_t depth,
-                               Format format, void*& texture) {};
-
-  virtual void ClearTexture3D(void* texture_handle) {};
-
-  virtual void TextureSubImage2D(void* texture_handle, int32_t xoffset,
-                                 int32_t yoffset, int32_t width, int32_t height,
-                                 void* data_ptr, int32_t level,
-                                 Format format) {};
-
-  virtual void TextureSubImage3D(void* texture_handle, int32_t xoffset,
-                                 int32_t yoffset, int32_t zoffset,
-                                 int32_t width, int32_t height, int32_t depth,
-                                 void* data_ptr, int32_t level, Format format);
-
- private:
-  typedef std::vector<VulkanBuffer> VulkanBuffers;
-  typedef std::map<unsigned long long, VulkanBuffers> DeleteQueue;
-
- private:
-  bool CreateVulkanBuffer(size_t bytes, VulkanBuffer* buffer,
-                          VkBufferUsageFlags usage);
-  void ImmediateDestroyVulkanBuffer(const VulkanBuffer& buffer);
-  void SafeDestroy(unsigned long long frameNumber, const VulkanBuffer& buffer);
-  void GarbageCollect(bool force = false);
-
- private:
-  IUnityGraphicsVulkan* m_UnityVulkan;
-  UnityVulkanInstance m_Instance;
-  VulkanBuffer m_TextureStagingBuffer;
-  std::map<unsigned long long, VulkanBuffers> m_DeleteQueue;
-};
 
 TextureSubPluginAPI* CreateTextureSubPluginAPI_Vulkan() {
   return new TextureSubPluginAPI_Vulkan();
@@ -302,6 +315,22 @@ bool TextureSubPluginAPI_Vulkan::CreateVulkanBuffer(size_t sizeInBytes,
   return true;
 }
 
+int32_t TextureSubPluginAPI_Vulkan::FindMemoryType(
+    uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
+  // query info about the available types ofmemory
+  VkPhysicalDeviceMemoryProperties memProperties;
+  vkGetPhysicalDeviceMemoryProperties(m_Instance.physicalDevice,
+                                      &memProperties);
+  for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i) {
+    if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags &
+                                    properties) == properties) {
+      return i;
+    }
+  }
+  UNITY_LOG_ERROR(g_Log, "failed to find suitable memory type!");
+  return -1;
+}
+
 void TextureSubPluginAPI_Vulkan::ImmediateDestroyVulkanBuffer(
     const VulkanBuffer& buffer) {
   if (buffer.buffer != VK_NULL_HANDLE)
@@ -338,6 +367,106 @@ void TextureSubPluginAPI_Vulkan::GarbageCollect(bool force /*= false*/) {
   }
 }
 
+void TextureSubPluginAPI_Vulkan::CreateTexture3D(uint32_t texture_id,
+                                                 uint32_t width,
+                                                 uint32_t height,
+                                                 uint32_t depth,
+                                                 Format format) {
+  if (auto search = m_CreatedTextures.find(texture_id);
+      search != m_CreatedTextures.end()) {
+    UNITY_LOG_ERROR(g_Log,
+                    "a texture with the provided texture ID already exists!");
+    return;
+  }
+
+  VkFormat vk_format;
+  switch (format) {
+    case Format::R8_UINT:
+      vk_format = VK_FORMAT_R8_UNORM;
+      break;
+    case Format::R16_UINT:
+      vk_format = VK_FORMAT_R16_UNORM;
+      break;
+    default: {
+      std::ostringstream ss;
+      ss << __FUNCTION__ << " unsupported texture format: " << format;
+      UNITY_LOG_ERROR(g_Log, ss.str().c_str());
+      return;
+    }
+  }
+
+  VkImageCreateInfo img_info{};
+  img_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  img_info.imageType = VK_IMAGE_TYPE_2D;
+  img_info.extent.width = static_cast<uint32_t>(width);
+  img_info.extent.height = static_cast<uint32_t>(height);
+  img_info.extent.depth = static_cast<uint32_t>(depth);
+  img_info.mipLevels = 1;
+  img_info.arrayLayers = 1;
+  img_info.format = vk_format;
+  img_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+  img_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  img_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+  img_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  img_info.samples = VK_SAMPLE_COUNT_1_BIT;
+  img_info.flags = 0;
+
+  VkImage img;
+  if (vkCreateImage(m_Instance.device, &img_info, nullptr, &img) !=
+      VK_SUCCESS) {
+    std::ostringstream ss;
+    ss << __FUNCTION__ << " vkCreateImage failed";
+    UNITY_LOG_ERROR(g_Log, ss.str().c_str());
+    return;
+  }
+
+  // allocate memory for the image
+  VkDeviceMemory img_memory;
+  VkMemoryRequirements mem_requirements;
+  vkGetImageMemoryRequirements(m_Instance.device, img, &mem_requirements);
+
+  VkMemoryAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  alloc_info.allocationSize = mem_requirements.size;
+  alloc_info.memoryTypeIndex = FindMemoryType(
+      mem_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  if (vkAllocateMemory(m_Instance.device, &alloc_info, nullptr, &img_memory) !=
+      VK_SUCCESS) {
+    UNITY_LOG_ERROR(g_Log, "failed to allocate texture 3D memory!");
+    vkDestroyImage(m_Instance.device, img, nullptr);
+    return;
+  }
+
+  // bind the image to the allocated memory
+  vkBindImageMemory(m_Instance.device, img, img_memory, 0);
+
+  // store created image handle and its device memory handle
+  m_CreatedTextures.emplace(std::make_pair(
+      texture_id, std::make_pair(reinterpret_cast<void*>(img), img_memory)));
+}
+
+void* TextureSubPluginAPI_Vulkan::RetrieveCreatedTexture3D(
+    uint32_t texture_id) {
+  if (auto search = m_CreatedTextures.find(texture_id);
+      search != m_CreatedTextures.end()) {
+    return search->second.first;
+  }
+  UNITY_LOG_ERROR(g_Log, "no texture was created with the provided texture ID");
+  return nullptr;
+}
+
+void TextureSubPluginAPI_Vulkan::DestroyTexture3D(uint32_t texture_id) {
+  if (auto search = m_CreatedTextures.find(texture_id);
+      search != m_CreatedTextures.end()) {
+    vkDestroyImage(m_Instance.device, search->second.first, nullptr);
+    vkFreeMemory(m_Instance.device, search->second.second, nullptr);
+    return;
+  }
+  UNITY_LOG_ERROR(g_Log,
+                  "failed to destroy texture 3D (texture ID does not refer to "
+                  "a created texture 3D)");
+}
+
 void TextureSubPluginAPI_Vulkan::TextureSubImage3D(
     void* texture_handle, int32_t xoffset, int32_t yoffset, int32_t zoffset,
     int32_t width, int32_t height, int32_t depth, void* data_ptr, int32_t level,
@@ -366,8 +495,12 @@ void TextureSubPluginAPI_Vulkan::TextureSubImage3D(
     case R16_UINT:
       data_size = static_cast<size_t>(width) * height * height * 2;
       break;
-    default:
+    default: {
+      std::ostringstream ss;
+      ss << __FUNCTION__ << " unsupported texture format: " << format;
+      UNITY_LOG_ERROR(g_Log, ss.str().c_str());
       return;
+    }
   }
   m_TextureStagingBuffer = VulkanBuffer();
   if (!CreateVulkanBuffer(data_size, &m_TextureStagingBuffer,

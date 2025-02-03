@@ -1,5 +1,5 @@
 #include <sstream>
-#include <string>
+#include <unordered_map>
 
 #include "PlatformBase.hpp"
 #include "TextureSubPluginAPI.hpp"
@@ -39,13 +39,12 @@ class TextureSubPluginAPI_OpenGLCoreES : public TextureSubPluginAPI {
   TextureSubPluginAPI_OpenGLCoreES(UnityGfxRenderer apiType);
   virtual ~TextureSubPluginAPI_OpenGLCoreES() {}
 
-  virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type,
-                                  IUnityInterfaces* interfaces);
+  virtual void CreateTexture3D(uint32_t texture_id, uint32_t width,
+                               uint32_t height, uint32_t depth, Format format);
 
-  virtual void CreateTexture3D(uint32_t width, uint32_t height, uint32_t depth,
-                               Format format, void*& texture);
+  virtual void* RetrieveCreatedTexture3D(uint32_t texture_id);
 
-  virtual void ClearTexture3D(void* texture_handle);
+  virtual void DestroyTexture3D(uint32_t texture_id);
 
   virtual void TextureSubImage2D(void* texture_handle, int32_t xoffset,
                                  int32_t yoffset, int32_t width, int32_t height,
@@ -56,8 +55,12 @@ class TextureSubPluginAPI_OpenGLCoreES : public TextureSubPluginAPI {
                                  int32_t width, int32_t height, int32_t depth,
                                  void* data_ptr, int32_t level, Format format);
 
+  virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type,
+                                  IUnityInterfaces* interfaces);
+
  private:
   UnityGfxRenderer m_APIType;
+  std::unordered_map<uint32_t, GLuint> m_CreatedTextures;
 };
 
 TextureSubPluginAPI* CreateTextureSubPluginAPI_OpenGLCoreES(
@@ -159,11 +162,18 @@ void TextureSubPluginAPI_OpenGLCoreES::TextureSubImage2D(
                   gltype, data_ptr);
 }
 
-void TextureSubPluginAPI_OpenGLCoreES::CreateTexture3D(uint32_t width,
+void TextureSubPluginAPI_OpenGLCoreES::CreateTexture3D(uint32_t texture_id,
+                                                       uint32_t width,
                                                        uint32_t height,
                                                        uint32_t depth,
-                                                       Format format,
-                                                       void*& texture) {
+                                                       Format format) {
+  if (auto search = m_CreatedTextures.find(texture_id);
+      search != m_CreatedTextures.end()) {
+    UNITY_LOG_ERROR(g_Log,
+                    "a texture with the provided texture ID already exists!");
+    return;
+  }
+
   int MAX_DIM_SIZE;
   glGetIntegerv(GL_MAX_3D_TEXTURE_SIZE, &MAX_DIM_SIZE);
   {
@@ -183,10 +193,12 @@ void TextureSubPluginAPI_OpenGLCoreES::CreateTexture3D(uint32_t width,
       internal_format = GL_R16;
       type = GL_UNSIGNED_SHORT;
       break;
-    default:
-      texture = NULL;
+    default: {
+      std::ostringstream ss;
+      ss << __FUNCTION__ << " unsupported texture format: " << format;
+      UNITY_LOG_ERROR(g_Log, ss.str().c_str());
       return;
-      break;
+    }
   }
 
   GLuint gl_texture;
@@ -217,7 +229,6 @@ void TextureSubPluginAPI_OpenGLCoreES::CreateTexture3D(uint32_t width,
       ss << " 0x" << err;
     }
     UNITY_LOG_ERROR(g_Log, ss.str().c_str());
-    texture = NULL;
     return;
   }
 
@@ -227,11 +238,28 @@ void TextureSubPluginAPI_OpenGLCoreES::CreateTexture3D(uint32_t width,
     UNITY_LOG(g_Log, ss.str().c_str());
   }
 
-  texture = (void*)gl_texture;
+  m_CreatedTextures.emplace(std::make_pair(texture_id, gl_texture));
 }
 
-void TextureSubPluginAPI_OpenGLCoreES::ClearTexture3D(void* texture_handle) {
-  glDeleteTextures(1, (GLuint*)&texture_handle);
+void* TextureSubPluginAPI_OpenGLCoreES::RetrieveCreatedTexture3D(
+    uint32_t texture_id) {
+  if (auto search = m_CreatedTextures.find(texture_id);
+      search != m_CreatedTextures.end()) {
+    return reinterpret_cast<void*>(search->second);
+  }
+  UNITY_LOG_ERROR(g_Log, "no texture was created with the provided texture ID");
+  return nullptr;
+}
+
+void TextureSubPluginAPI_OpenGLCoreES::DestroyTexture3D(uint32_t texture_id) {
+  if (auto search = m_CreatedTextures.find(texture_id);
+      search != m_CreatedTextures.end()) {
+    glDeleteTextures(1, &(search->second));
+    return;
+  }
+  UNITY_LOG_ERROR(g_Log,
+                  "failed to destroy texture 3D (texture ID does not refer to "
+                  "a created texture 3D)");
 }
 
 #endif  // #if SUPPORT_OPENGL_UNIFIED
