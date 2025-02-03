@@ -238,7 +238,7 @@ void TextureSubPluginAPI_OpenGLCoreES::CreateTexture3D(uint32_t texture_id,
     UNITY_LOG(g_Log, ss.str().c_str());
   }
 
-  m_CreatedTextures.emplace(std::make_pair(texture_id, gl_texture));
+  m_CreatedTextures.insert({texture_id, gl_texture});
 }
 
 void* TextureSubPluginAPI_OpenGLCoreES::RetrieveCreatedTexture3D(

@@ -37,7 +37,7 @@ class TextureSubPluginAPI {
   /// CreateTexture3D. This function can be called outside of the render thread
   /// @param[in] texture_id the user assigned unique ID of the texture in the
   /// CreateTexture3D call
-  virtual void* RetrieveCreatedTexture3D(uint32_t texture_id);
+  virtual void* RetrieveCreatedTexture3D(uint32_t texture_id) = 0;
 
   /// @brief Destroys/releases a given 3D texture
   /// @param[in] texture_id 3D texture's ID. This id is assigned by the caller
