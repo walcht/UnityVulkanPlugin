@@ -120,9 +120,12 @@ static void UNITY_INTERFACE_API OnRenderEvent(int eventID, void* data) {
     case Event::DestroyTexture3D: {
       auto args = static_cast<DestroyTexture3DParams*>(data);
       s_CurrentAPI->DestroyTexture3D(args->texture_id);
-    }
-    default:
       break;
+    }
+    default: {
+      UNITY_LOG_ERROR(g_Log, "unknown event ID!");
+      return;
+    }
   }
 }
 

@@ -21,7 +21,7 @@ target_include_directories(TextureSubPlugin
 # compiler flags (CXXFLAGS)
 target_compile_definitions(TextureSubPlugin
     PRIVATE
-    #   -DSUPPORT_VULKAN=1
+        -DSUPPORT_VULKAN=1
     #   -DSUPPORT_OPENGL_UNIFIED=1
     #   -DUNITY_LINUX=1
 )

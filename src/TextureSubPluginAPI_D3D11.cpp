@@ -3,14 +3,13 @@
 
 #if SUPPORT_D3D11
 
-#include <ostream>
-#include <unordered_map>
 #include <assert.h>
 #include <d3d11.h>
 
-
+#include <ostream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 
 #include "Unity/IUnityGraphicsD3D11.h"
 #include "Unity/IUnityLog.h"
@@ -124,12 +123,12 @@ void TextureSubPluginAPI_D3D11::TextureSubImage3D(
   }
 
   uint32_t depth_pitch = height * row_pitch;
-  ID3D11Texture2D* d3dtex = (ID3D11Texture2D*)texture_handle;
+  ID3D11Texture3D* d3dtex = (ID3D11Texture3D*)texture_handle;
   assert(d3dtex);
   ID3D11DeviceContext* ctx = NULL;
   m_Device->GetImmediateContext(&ctx);
 
-  D3D11_BOX box;
+  D3D11_BOX box{};
   box.left = xoffset;
   box.top = yoffset;
   box.front = zoffset;
@@ -145,8 +144,8 @@ void TextureSubPluginAPI_D3D11::TextureSubImage3D(
 void TextureSubPluginAPI_D3D11::CreateTexture3D(uint32_t texture_id,
                                                 uint32_t width, uint32_t height,
                                                 uint32_t depth, Format format) {
-  uint32_t size_in_bytes;
-  D3D11_TEXTURE3D_DESC desc;
+  uint32_t size_in_mbs;
+  D3D11_TEXTURE3D_DESC desc{};
   desc.Width = width;
   desc.Height = height;
   desc.Depth = depth;
@@ -154,11 +153,11 @@ void TextureSubPluginAPI_D3D11::CreateTexture3D(uint32_t texture_id,
   switch (format) {
     case R8_UINT:
       desc.Format = DXGI_FORMAT_R8_UNORM;
-      size_in_bytes = width * height * depth;
+      size_in_mbs = width * height * depth / (1024 * 1024);
       break;
     case R16_UINT:
       desc.Format = DXGI_FORMAT_R16_UNORM;
-      size_in_bytes = width * height * depth * 2;
+      size_in_mbs = width * height * depth * 2 / (1024 * 1024);
       break;
     default: {
       std::ostringstream ss;
@@ -174,11 +173,11 @@ void TextureSubPluginAPI_D3D11::CreateTexture3D(uint32_t texture_id,
   desc.CPUAccessFlags = 0;
   desc.MiscFlags = 0;
 
-  if (size_in_bytes > D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_C_TERM) {
+  if (size_in_mbs > D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_C_TERM) {
     std::ostringstream msg;
     msg << "Texture size exceeds Direct3D 11/12 max resource size. Texture "
            "Size: "
-        << size_in_bytes / (1024 * 1024) << "MB"
+        << size_in_mbs << "MB"
         << " Max: " << D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_C_TERM
         << "MB";
     UNITY_LOG_ERROR(g_Log, msg.str().c_str());
@@ -201,16 +200,15 @@ void TextureSubPluginAPI_D3D11::CreateTexture3D(uint32_t texture_id,
   UNITY_LOG(g_Log, address.str().c_str());
 
   // store created texture handle
-  m_CreatedTextures.emplace(std::make_pair(texture_id, d3dtex));
+  m_CreatedTextures.insert({texture_id, d3dtex});
 
   ctx->Release();
 }
 
-void* TextureSubPluginAPI_D3D11::RetrieveCreatedTexture3D(
-    uint32_t texture_id) {
+void* TextureSubPluginAPI_D3D11::RetrieveCreatedTexture3D(uint32_t texture_id) {
   if (auto search = m_CreatedTextures.find(texture_id);
       search != m_CreatedTextures.end()) {
-    return search->second.first;
+    return search->second;
   }
   UNITY_LOG_ERROR(g_Log, "no texture was created with the provided texture ID");
   return nullptr;
