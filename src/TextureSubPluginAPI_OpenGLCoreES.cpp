@@ -7,12 +7,10 @@
 // OpenGL Core profile (desktop) or OpenGL ES (mobile) implementation of
 // RenderAPI. Supports several flavors: Core, ES2, ES3
 
-#if SUPPORT_OPENGL_UNIFIED
+#if SUPPORT_OPENGL_CORE
 
 #include <assert.h>
-#if UNITY_IOS || UNITY_TVOS
-#include <OpenGLES/ES2/gl.h>
-#elif UNITY_ANDROID || UNITY_WEBGL
+#if UNITY_ANDROID || UNITY_WEBGL
 #include <GLES2/gl2.h>
 #elif UNITY_OSX
 #include <OpenGL/gl3.h>
@@ -262,4 +260,4 @@ void TextureSubPluginAPI_OpenGLCoreES::DestroyTexture3D(uint32_t texture_id) {
                   "a created texture 3D)");
 }
 
-#endif  // #if SUPPORT_OPENGL_UNIFIED
+#endif  // #if SUPPORT_OPENGL_CORE

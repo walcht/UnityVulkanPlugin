@@ -6,18 +6,28 @@ Texture2D/3D 2GBs size limitation.
 
 This repository is adapted from [Unity native rendering plugin repository](https://github.com/Unity-Technologies/NativeRenderingPlugin/tree/master).
 
-## Installation
+## Building the Plugin
 
-1. build the plugin using CMake. Assuming you are in this repo's root:
+1.  build the plugin using CMake. Assuming you are in this repo's root:
 
     ```bash
-    mkdir build
-    cd build
+    mkdir build && cd build
     cmake ..
     ```
     
     if you are on Windows, then the easiest way to configure the build is using
     cmake-gui and opening the generated build files with Visual Studio.
+    
+    if you are targeting Android then provide cmake with the NDK cmake toolchain
+    file and additional NDK arguments
+    (see [ndk-cmake-guide](https://developer.android.com/ndk/guides/cmake)):
+
+    ```bash
+    mkdir build && cd build
+    cmake .. -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
+        -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-29 \
+        -DANDROID_STL=c++_shared
+    ```
 
 1. navigate to the built TextureSubPlugin.so (libTextureSubPlugin.so on Linux)
    in your build directory and copy it to your
@@ -25,6 +35,7 @@ This repository is adapted from [Unity native rendering plugin repository](https
 
 1. add the attached `TextureSubPlugin.cs` to your Unity project for
    plugin-related enums, structs, and API declarations.
+
 
 ## Usage
 
