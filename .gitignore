@@ -403,3 +403,5 @@ build/
 # external dependencies
 extern/
 compile_commands.json
+include/glad/
+include/KHR/
