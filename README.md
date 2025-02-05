@@ -8,34 +8,38 @@ This repository is adapted from [Unity native rendering plugin repository](https
 
 ## Building the Plugin
 
-1.  build the plugin using CMake. Assuming you are in this repo's root:
+1.  build the plugin using CMake. Assuming you are in the same folder as this
+    README:
 
     ```bash
-    mkdir build && cd build
-    cmake ..
-    ```
-    
-    if you are on Windows, then the easiest way to configure the build is using
-    cmake-gui and opening the generated build files with Visual Studio.
-    
-    if you are targeting Android then provide cmake with the NDK cmake toolchain
-    file and additional NDK arguments
-    (see [ndk-cmake-guide](https://developer.android.com/ndk/guides/cmake)):
-
-    ```bash
-    mkdir build && cd build
-    cmake .. -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
-        -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-29 \
-        -DANDROID_STL=c++_shared
+    mkdir build
+    cd build
+    cmake .. --preset <preset>
+    cmake --build . --config Release
+    cmake --install . --prefix <path-to-unity-project>
     ```
 
-1. navigate to the built TextureSubPlugin.so (libTextureSubPlugin.so on Linux)
-   in your build directory and copy it to your
-   `<unity-project-dir>/Assets/Plugins/` folder
+    *preset* is the target you are building this plugin for. Check 
+    CMakeLists.txt for the available presets and configuration. *preset* can be:
 
-1. add the attached `TextureSubPlugin.cs` to your Unity project for
-   plugin-related enums, structs, and API declarations.
+    - **windows** - in case **SUPPORT_OPENGL_CORE** is set, **GLAD_PATH** has to
+        be filled with the path to [glad](https://glad.dav1d.de/)
 
+    - **linux** - in case **SUPPORT_VULKAN** is set, Vulkan SDK has to be installed
+
+    - **android** - not possible to build for this target on Windows. NDK cmake
+    toolchain file has to be provided. Assuming you have installed Android build
+    support module for your target Unity version, NDK cmake toolchain file
+    usually has this path:
+    ```Unity/Hub/Editor/<version>/Editor/Data/PlaybackEngines/AndroidPlayer/NDK/build/cmake/android.toolchain.cmake```
+    Additionally, **ANDROID_ABI**, **ANDROID_PLATFORM**, and **ANDROID_STL** have
+    to be populated.
+    see [NDK cmake guide](https://developer.android.com/ndk/guides/cmake>).
+
+    - **magicleap2** - same as android preset but with populated NDK arguments.
+
+2. both the libray files (TextureSubPlugin.so and libTextureSubPlugin.so) should
+   now be available in ```UnityProjectPath/Assets/Plugins```
 
 ## Usage
 
