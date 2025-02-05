@@ -1,31 +1,28 @@
-cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
+
 project(TextureSubPlugin)
 
-# initally set all graphics API supports to 0
-set(SUPPORT_VULKAN 0)
-set(SUPPORT_D3D11 0)
-set(SUPPORT_OPENGL_ES 0)
-set(SUPPORT_OPENGL_CORE 0)
+message(STATUS "building for target ${CMAKE_SYSTEM_NAME}")
 
-set(UNITY_LINUX 0)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message("Setting build type to 'Release' as none was specified.")
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "build type" FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release"
+    "MinSizeRel" "RelWithDebInfo")
+endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+message(STATUS "build type is ${CMAKE_BUILD_TYPE}")
 
-  set(SUPPORT_D3D11 1 CACHE BOOL "include Direct3D11 support?")
-  set(SUPPORT_VULKAN 0 CACHE BOOL "include Vulkan support?")
+# Unity's plugin API (PluginAPI folder) path
+if(NOT IS_DIRECTORY ${UNITY_PLUGIN_API})
+  message(FATAL_ERROR "target Unity's PluginAPI folder path has to provided by setting UNITY_PLUGIN_API")
+endif()
 
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-
-  set(SUPPORT_VULKAN 1 CACHE BOOL "include Vulkan support?")
-  set(SUPPORT_OPENGL_CORE 0 CACHE BOOL "include OpenGL Core support?")
-  set(SUPPORT_OPENGL_ES 0 CACHE BOOL "include OpenGL ES support?")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(UNITY_LINUX 1)
-
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
-
-  set(SUPPORT_VULKAN 1 CACHE BOOL "include Vulkan support?")
-  set(SUPPORT_OPENGL_ES 0 CACHE BOOL "include OpenGL ES support?")
-
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Android" AND CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+  message(FATAL_ERROR "building native plugin for Android using NDK is not supported on Windows")
 endif()
 
 set(SOURCES
@@ -37,10 +34,14 @@ if (SUPPORT_VULKAN)
   list(APPEND SOURCES src/TextureSubPluginAPI_Vulkan.cpp)
 endif()
 
-if (SUPPORT_OPENGL)
+if (SUPPORT_OPENGL_CORE)
   list(APPEND SOURCES src/TextureSubPluginAPI_OpenGLCoreES.cpp)
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    list(APPEND SOURCES extern/glad/glad.c)
+    # glad path for OpenGL build on Windows
+    if(NOT IS_DIRECTORY ${GLAD_PATH})
+      message(FATAL_ERROR "glad (OpenGL loader) is not a valid directory - set it by assigning GLAD_PATH")
+    endif()
+    list(APPEND SOURCES ${GLAD_PATH}/src/glad.c)
   endif()
 endif()
 
@@ -54,16 +55,41 @@ set_property(TARGET TextureSubPlugin PROPERTY CXX_STANDARD 17)
 
 target_include_directories(TextureSubPlugin
     PRIVATE
-        ${PROJECT_SOURCE_DIR}/include/
         ${PROJECT_SOURCE_DIR}/src/
+        ${UNITY_PLUGIN_API}
 )
 
-target_include_directories(TextureSubPlugin
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}/src
-)
+if(SUPPORT_OPENGL_CORE AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  target_include_directories(TextureSubPlugin
+      PRIVATE
+          ${GLAD_PATH}/include/
+  )
+endif()
 
-# compiler definitions
+if(SUPPORT_VULKAN)
+  find_package(Vulkan)
+  if(NOT Vulkan_FOUND)
+    message(WARNING "could not find Vulkan SDK - unsetting SUPPORT_VULKAN")
+    unset(SUPPORT_VULKAN)
+  endif()
+  target_link_libraries(TextureSubPlugin Vulkan::Vulkan)
+endif()
+
+if(SUPPORT_OPENGL_CORE)
+  find_package(OpenGL)
+  if(NOT OpenGL_FOUND)
+    message(WARNING "could not find OpenGL - unsetting SUPPORT_OPENGL_CORE")
+    unset(SUPPORT_OPENGL_CORE)
+  endif()
+  target_link_libraries(TextureSubPlugin OpenGL::GL)
+endif()
+
+
+if(SUPPORT_OPENGL_ES)
+  # TODO: add OpenGLES support
+endif()
+
+# pass preprocessor definitions
 target_compile_definitions(TextureSubPlugin
     PRIVATE
         -DSUPPORT_VULKAN=${SUPPORT_VULKAN}
@@ -72,16 +98,5 @@ target_compile_definitions(TextureSubPlugin
         -DUNITY_LINUX=${UNITY_LINUX}
 )
 
-if(SUPPORT_VULKAN)
-  find_package(Vulkan REQUIRED)
-  target_link_libraries(TextureSubPlugin
-    Vulkan::Vulkan
-  )
-endif()
-
-if(SUPPORT_OPENGL)
-  find_package(OpenGL REQUIRED)
-  target_link_libraries(TextureSubPlugin
-    OpenGL::GL
-  )
-endif()
+install(TARGETS TextureSubPlugin DESTINATION Assets/Plugins)
+install(FILES ${PROJECT_SOURCE_DIR}/TextureSubPlugin.cs DESTINATION Assets/Plugins)

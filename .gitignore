@@ -377,12 +377,7 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # VS Code files for those working on multiple tools
-.vscode/*
-.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-*.code-workspace
+.vscode/
 
 # Local History for Visual Studio Code
 .history/
@@ -401,7 +396,4 @@ FodyWeavers.xsd
 build/
 
 # external dependencies
-extern/
 compile_commands.json
-include/glad/
-include/KHR/

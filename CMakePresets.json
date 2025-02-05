@@ -1,0 +1,58 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default Config",
+      "description": "Default build - should not be used directly",
+      "cacheVariables": {
+        "UNITY_PLUGIN_API": "C:/Program Files/Unity/Hub/Editor/2022.3.28f1/Editor/Data/PluginAPI"
+      }
+    },
+    {
+      "name": "windows",
+      "inherits": "default",
+      "description": "Build for Windows target",
+      "cacheVariables": {
+        "SUPPORT_D3D11": "1",
+        "SUPPORT_VULKAN": "1",
+        "SUPPORT_OPENGL_CORE": "1",
+        "GLAD_PATH": "C:/Users/walid/Downloads/glad"
+      }
+    },
+    {
+      "name": "linux",
+      "inherits": "default",
+      "description": "Build for Linux target",
+      "cacheVariables": {
+        "SUPPORT_VULKAN": "1",
+        "SUPPORT_OPENGL_CORE": null
+      }
+    },
+    {
+      "name": "android",
+      "inherits": "default",
+      "description": "Build for Android target",
+      "cacheVariables": {
+        "SUPPORT_VULKAN": "1",
+        "SUPPORT_OPENGL_ES": null,
+        "ANDROID_ABI": null,
+        "ANDROID_PLATFORM": null,
+        "ANDROID_STL": null
+      },
+      "toolchainFile": "C:/Program Files/Unity/Hub/Editor/2022.3.28f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK/build/cmake/android.toolchain.cmake"
+    },
+    {
+      "name": "magicleap2",
+      "inherits": "android",
+      "description": "Build for Magic Leap 2 target (Android x86_64)",
+      "cacheVariables": {
+        "SUPPORT_VULKAN": "1",
+        "SUPPORT_OPENGL_ES": null,
+        "ANDROID_ABI": "x86_64",
+        "ANDROID_PLATFORM": "android-29",
+        "ANDROID_STL": "c++_shared"
+      }
+    }
+  ]
+}

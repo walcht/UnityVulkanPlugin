@@ -3,8 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "Unity/IUnityGraphics.h"
-#include "Unity/IUnityLog.h"
+#include "IUnityGraphics.h"
+#include "IUnityLog.h"
 
 struct IUnityInterfaces;
 

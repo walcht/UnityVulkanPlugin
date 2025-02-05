@@ -14,7 +14,7 @@
 // This plugin does not link to the Vulkan loader, easier to support multiple
 // APIs and systems that don't have Vulkan support
 #define VK_NO_PROTOTYPES
-#include "Unity/IUnityGraphicsVulkan.h"
+#include "IUnityGraphicsVulkan.h"
 
 #define UNITY_USED_VULKAN_API_FUNCTIONS(apply) \
   apply(vkCreateInstance);                     \

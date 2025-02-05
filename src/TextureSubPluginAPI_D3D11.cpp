@@ -11,8 +11,8 @@
 #include <string>
 #include <unordered_map>
 
-#include "Unity/IUnityGraphicsD3D11.h"
-#include "Unity/IUnityLog.h"
+#include "IUnityGraphicsD3D11.h"
+#include "IUnityLog.h"
 
 class TextureSubPluginAPI_D3D11 : public TextureSubPluginAPI {
  public:
