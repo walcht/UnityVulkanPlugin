@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <sstream>
 #include <unordered_map>
 
@@ -58,7 +59,7 @@ class TextureSubPluginAPI_OpenGLCoreES : public TextureSubPluginAPI {
 
  private:
   UnityGfxRenderer m_APIType;
-  std::unordered_map<uint32_t, GLuint> m_CreatedTextures;
+  std::unordered_map<uint32_t, uint32_t> m_CreatedTextures;
 };
 
 TextureSubPluginAPI* CreateTextureSubPluginAPI_OpenGLCoreES(
