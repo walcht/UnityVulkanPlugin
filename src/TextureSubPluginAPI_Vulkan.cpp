@@ -437,7 +437,7 @@ void TextureSubPluginAPI_Vulkan::CreateTexture3D(uint32_t texture_id,
   if (vkAllocateMemory(m_Instance.device, &alloc_info, nullptr, &img_memory) !=
       VK_SUCCESS) {
     UNITY_LOG_ERROR(g_Log, "failed to allocate texture 3D memory!");
-    // vkDestroyImage(m_Instance.device, img, nullptr);
+    vkDestroyImage(m_Instance.device, img, nullptr);
     return;
   }
 
@@ -523,7 +523,7 @@ void TextureSubPluginAPI_Vulkan::TextureSubImage3D(
     return;
   }
   memcpy(m_TextureStagingBuffer.mapped, data_ptr, data_size);
-  // vkUnmapMemory(m_Instance.device, m_TextureStagingBuffer.deviceMemory);
+  vkUnmapMemory(m_Instance.device, m_TextureStagingBuffer.deviceMemory);
 
   // cannot do resource uploads inside renderpass
   m_UnityVulkan->EnsureOutsideRenderPass();
