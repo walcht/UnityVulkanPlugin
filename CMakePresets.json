@@ -1,12 +1,12 @@
 {
-  "version": 6,
+  "version": 3,
   "configurePresets": [
     {
       "name": "default",
       "displayName": "Default Config",
       "description": "Default build - should not be used directly",
       "cacheVariables": {
-        "UNITY_PLUGIN_API": "C:/Program Files/Unity/Hub/Editor/2022.3.28f1/Editor/Data/PluginAPI"
+        "UNITY_PLUGIN_API": "/home/walcht/Unity/Hub/Editor/2022.3.51f1/Editor/Data/PluginAPI"
       }
     },
     {
@@ -15,8 +15,9 @@
       "description": "Build for Windows target",
       "cacheVariables": {
         "SUPPORT_D3D11": "1",
-        "SUPPORT_VULKAN": "1",
+        "SUPPORT_VULKAN": "0",
         "SUPPORT_OPENGL_CORE": "1",
+        "SUPPORT_OPENGL_ES": "0",
         "GLAD_PATH": "C:/Users/walid/Downloads/glad"
       }
     },
@@ -25,8 +26,10 @@
       "inherits": "default",
       "description": "Build for Linux target",
       "cacheVariables": {
+        "SUPPORT_D3D11": "0",
         "SUPPORT_VULKAN": "1",
-        "SUPPORT_OPENGL_CORE": null
+        "SUPPORT_OPENGL_CORE": "1",
+        "SUPPORT_OPENGL_ES": "0"
       }
     },
     {
@@ -34,13 +37,15 @@
       "inherits": "default",
       "description": "Build for Android target",
       "cacheVariables": {
+        "SUPPORT_D3D11": "0",
         "SUPPORT_VULKAN": "1",
-        "SUPPORT_OPENGL_ES": null,
+        "SUPPORT_OPENGL_CORE": "0",
+        "SUPPORT_OPENGL_ES": "0",
         "ANDROID_ABI": null,
         "ANDROID_PLATFORM": null,
         "ANDROID_STL": null
       },
-      "toolchainFile": "C:/Program Files/Unity/Hub/Editor/2022.3.28f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK/build/cmake/android.toolchain.cmake"
+      "toolchainFile": "/home/walcht/Unity/Hub/Editor/2022.3.51f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK/build/cmake/android.toolchain.cmake"
     },
     {
       "name": "magicleap2",
