@@ -5,6 +5,8 @@ create 3D/2D textures which is quite handy for circumventing Unity's
 Texture2D/3D 2GBs size limitation.
 
 This repository is adapted from [Unity native rendering plugin repository](https://github.com/Unity-Technologies/NativeRenderingPlugin/tree/master).
+Rather than having multiple build files, this project makes use of a single
+build generator system using CMake.
 
 ## Building the Plugin
 
@@ -14,32 +16,40 @@ This repository is adapted from [Unity native rendering plugin repository](https
     ```bash
     mkdir build
     cd build
+    export UNITY_EDITOR_PATH=<path-to-your-installed-unity-editor>
     cmake .. --preset <preset>
     cmake --build . --config Release
-    cmake --install . --prefix <path-to-unity-project>
+    cmake --install . --prefix <path-to-unity-project-plugins-folder>
     ```
 
+    **UNITY_EDITOR_PATH** is the path to your Unity editor. You can get it by
+    going to your Unity Hub > Installs > pick which installed editor you
+    want to use > Show File in File Browser.
+
     *preset* is the target you are building this plugin for. Check 
-    CMakeLists.txt for the available presets and configuration. *preset* can be:
+    ```CMakePresets.txt``` for the available presets and configuration.
+    *preset* can be:
 
     - **windows** - in case **SUPPORT_OPENGL_CORE** is set, **GLAD_PATH** has to
-        be filled with the path to [glad](https://glad.dav1d.de/)
+    be filled with the path to [glad](https://glad.dav1d.de/)
 
-    - **linux** - in case **SUPPORT_VULKAN** is set, Vulkan SDK has to be installed
+    - **linux** - in case **SUPPORT_VULKAN** is set, Vulkan SDK has to be
+    installed
 
-    - **android** - not possible to build for this target on Windows. NDK cmake
-    toolchain file has to be provided. Assuming you have installed Android build
-    support module for your target Unity version, NDK cmake toolchain file
-    usually has this path:
-    ```Unity/Hub/Editor/<version>/Editor/Data/PlaybackEngines/AndroidPlayer/NDK/build/cmake/android.toolchain.cmake```
+    - **android** - not possible to build for this target on Windows. Make sure
+    that your Unity editor has the module **Android SDK & NDK Tools** installed.
     Additionally, **ANDROID_ABI**, **ANDROID_PLATFORM**, and **ANDROID_STL** have
-    to be populated.
+    to be populated (go to CMakePresets.txt and populate them for your target)
     see [NDK cmake guide](https://developer.android.com/ndk/guides/cmake>).
 
     - **magicleap2** - same as android preset but with populated NDK arguments.
 
 2. both the libray files (TextureSubPlugin.so and libTextureSubPlugin.so) should
-   now be available in ```UnityProjectPath/Assets/Plugins```
+   now be available in the provided installation directory (has to be in
+   Assets/Plugins for the plugin to be found and loaded)
+
+3. in your Unity project, click on the installed .so/.dll native plugin file and
+   fill the platform settings
 
 ## Usage
 
@@ -90,10 +100,18 @@ if (native_tex_ptr == IntPtr.Zero) {
         "Make sure that your platform supports native code plugins");
 }
 
-// finally create the actual Unity Texture 3D object by supplying a pointer
+// create the actual Unity Texture 3D object by supplying a pointer
 // to the externaly create texture
 Texture3D tex = Texture3D.CreateExternalTexture(..., ..., ..., ...,
     mipChain: ..., nativeTex: native_tex_ptr);
+
+// finally, make sure to overwrite native_tex_ptr
+// this has to be overwritten for Vulkan to work because Unity expects a
+// VkImage* for the nativeTex paramerter not a VkImage. GetNativeTexturePtr does
+// not actually return a VkImage* as it claims but rather a VkImage
+// => this is probably a Unity bug.
+// (see https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Texture3D.CreateExternalTexture.html)
+native_tex_ptr = m_brick_cache.GetNativeTexturePtr();
 ```
 
 If you have used ```CreateTexture3D``` to create a native texture then you
@@ -177,6 +195,25 @@ Marshal.FreeHGlobal(p_args);
 // hey GC, you are again free to manage the data object
 handle.Free();
 ```
+
+## Q&A
+
+### Why do I get DllNotFoundException and how to solve it?
+
+If you get a DllNotFoundException when trying your Unity build on your target,
+the reasons might be:
+
+- you compiled the plugin using a different compiler/toolchain than what you
+compiled your Unity project, that uses the .so/.dll plugin, with. **Make sure
+that you use the same compiler/toolchain. This is simply done by setting
+UNITY_EDITOR_PATH to that of the same editor you are using to build your Unity
+project.**
+
+- refrain from renaming the build .so/.dll file and make sure that it is put
+somewhere Unity can find it (usually Assets/Plugins).
+
+- make sure that in Unity Editor, the installed .so/.dll has the correct
+platform settings filled (CPU, OS, Include Platforms, etc.).
 
 ## License
 
