@@ -49,6 +49,7 @@ if (SUPPORT_D3D11)
   list(APPEND SOURCES src/TextureSubPluginAPI_D3D11.cpp)
 endif()
 
+# POSITION_INDEPENDENT_CODE property is True by default for SHARED targets
 add_library(TextureSubPlugin SHARED ${SOURCES})
 
 set_property(TARGET TextureSubPlugin PROPERTY CXX_STANDARD 17)
@@ -99,5 +100,5 @@ target_compile_definitions(TextureSubPlugin
         -DUNITY_LINUX=${UNITY_LINUX}
 )
 
-install(TARGETS TextureSubPlugin DESTINATION Assets/Plugins)
-install(FILES ${PROJECT_SOURCE_DIR}/TextureSubPlugin.cs DESTINATION Assets/Plugins)
+install(TARGETS TextureSubPlugin DESTINATION .)
+install(FILES ${PROJECT_SOURCE_DIR}/TextureSubPlugin.cs DESTINATION .)
