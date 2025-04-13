@@ -472,6 +472,7 @@ void TextureSubPluginAPI_Vulkan::DestroyTexture3D(uint32_t texture_id) {
       search != m_CreatedTextures.end()) {
     vkDestroyImage(m_Instance.device, *(search->second.first), nullptr);
     vkFreeMemory(m_Instance.device, search->second.second, nullptr);
+    m_CreatedTextures.erase(search);
     return;
   }
   UNITY_LOG_ERROR(g_Log,
