@@ -16,15 +16,19 @@ build generator system using CMake.
     ```bash
     mkdir build
     cd build
-    export UNITY_EDITOR_PATH=<path-to-your-installed-unity-editor>
+    # or on Windows powershell: $env:UNITY_EDITOR_DATA_PATH="path-to-your-installed-unity-editor-data-folder"
+    export UNITY_EDITOR_DATA_PATH=<path-to-your-installed-unity-editor-data-folder>
     cmake .. --preset <preset>
-    cmake --build . --config Release
-    cmake --install . --prefix <path-to-unity-project-plugins-folder>
+    cmake --build .
+    cmake --install . --prefix <path-to-your-unity-project-plugins-folder>
     ```
 
-    **UNITY_EDITOR_PATH** is the path to your Unity editor. You can get it by
-    going to your Unity Hub > Installs > pick which installed editor you
-    want to use > Show File in File Browser.
+    **UNITY_EDITOR_DATA_PATH** is the path to your Unity Editor data folder. You
+    can get it by going to your Unity Hub > Installs > pick which installed editor you
+    want to use > Show File in File Browser > navigate to the Data folder >
+    copy absolute path (e.g., ```C:\Program Files\Unity\Hub\Editor\6000.0.40f1\Editor\Data```).
+    (Note: The **same** Unity Editor that is used for building your project should be set
+    here!)
 
     *preset* is the target you are building this plugin for. Check 
     ```CMakePresets.txt``` for the available presets and configuration.
@@ -36,16 +40,17 @@ build generator system using CMake.
     - **linux** - in case **SUPPORT_VULKAN** is set, Vulkan SDK has to be
     installed
 
-    - **android** - not possible to build for this target on Windows. Make sure
-    that your Unity editor has the module **Android SDK & NDK Tools** installed.
+    - **android** - Make sure that your Unity editor has the module **Android SDK & NDK Tools** installed.
     Additionally, **ANDROID_ABI**, **ANDROID_PLATFORM**, and **ANDROID_STL** have
     to be populated (go to CMakePresets.txt and populate them for your target)
     see [NDK cmake guide](https://developer.android.com/ndk/guides/cmake>).
 
     - **magicleap2** - same as android preset but with populated NDK arguments.
+    This preset uses the Ninja generator so that cross-compilation on a Windows
+    platform is working.
 
-2. both the libray files (TextureSubPlugin.so and libTextureSubPlugin.so) should
-   now be available in the provided installation directory (has to be in
+2. both the library files (TextureSubPlugin.so and libTextureSubPlugin.so) should
+   now be available in the provided installation directory (have to be in
    Assets/Plugins for the plugin to be found and loaded)
 
 3. in your Unity project, click on the installed .so/.dll native plugin file and
@@ -101,13 +106,13 @@ if (native_tex_ptr == IntPtr.Zero) {
 }
 
 // create the actual Unity Texture 3D object by supplying a pointer
-// to the externaly create texture
+// to the externally create texture
 Texture3D tex = Texture3D.CreateExternalTexture(..., ..., ..., ...,
     mipChain: ..., nativeTex: native_tex_ptr);
 
 // finally, make sure to overwrite native_tex_ptr
 // this has to be overwritten for Vulkan to work because Unity expects a
-// VkImage* for the nativeTex paramerter not a VkImage. GetNativeTexturePtr does
+// VkImage* for the nativeTex parameter not a VkImage. GetNativeTexturePtr does
 // not actually return a VkImage* as it claims but rather a VkImage
 // => this is probably a Unity bug.
 // (see https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Texture3D.CreateExternalTexture.html)
@@ -206,7 +211,7 @@ the reasons might be:
 - you compiled the plugin using a different compiler/toolchain than what you
 compiled your Unity project, that uses the .so/.dll plugin, with. **Make sure
 that you use the same compiler/toolchain. This is simply done by setting
-UNITY_EDITOR_PATH to that of the same editor you are using to build your Unity
+UNITY_EDITOR_DATA_PATH to that of the same editor you are using to build your Unity
 project.**
 
 - refrain from renaming the build .so/.dll file and make sure that it is put
