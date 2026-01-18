@@ -1,12 +1,17 @@
 # About
-TextureSubPlugin is a Unity low-level native plugin for uploading data to chunks
-(i.e., subregions or bricks) of a 2D/3D Texture. The plugin can also be used to
-create 3D/2D textures which is quite handy for circumventing Unity's
-Texture2D/3D 2GBs size limitation.
+*UnityVulkanPlugin* is a Unity low-level native plugin for accessing low-level Vulkan
+API using C++ within Unity. For instance, this can be used to upload data to chunks
+(i.e., subregions or bricks) of a 2D/3D Texture which is not possible with the exposed
+high-level Unity C# API. The plugin can also be used to create 3D/2D textures which is
+quite handy for circumventing Unity's Texture2D/3D 2GBs size limitation.
 
 This repository is adapted from [Unity native rendering plugin repository](https://github.com/Unity-Technologies/NativeRenderingPlugin/tree/master).
 Rather than having multiple build files, this project makes use of a single
 build generator system using CMake.
+
+Due to the high effort needed to maintain multiple graphics APIs, this plugin now
+only supports Vulkan. If you want to see how you can support other APIs, see
+the branch *old-multiple-apis*.
 
 ## Building the Plugin
 
